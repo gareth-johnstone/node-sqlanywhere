@@ -2,7 +2,7 @@
   "author": "SQL ANYWHERE",
   "name": "sqlanywhere",
   "description": "SQL Anywhere JavaScript Driver.",
-  "version": "2.0.2",
+  "version": "2.0.0",
   "repository": {
     "url": "https://github.com/gareth-johnstone/node-sqlanywhere"
   },
@@ -23,5 +23,10 @@
   "devDependencies": {
     "dotenv": "^17.2.2",
     "prebuild": "^13.0.1"
+  },
+  "binary": {
+    "napi_versions": [
+      3
+    ]
   }
 }
