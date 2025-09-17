@@ -39,7 +39,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # This is the key step. 'prebuild' will:
       # 1. Compile the addon using node-gyp.
       # 2. Package it into a correctly named .tar.gz file.
       # 3. Upload it to a draft release on GitHub.
