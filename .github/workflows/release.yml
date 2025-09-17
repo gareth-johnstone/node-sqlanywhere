@@ -43,4 +43,4 @@ jobs:
       # 2. Package it into a correctly named .tar.gz file.
       # 3. Upload it to a draft release on GitHub.
       - name: Compile, package, and upload binary
-        run: npx prebuild --runtime napi --all --upload ${{ secrets.GITHUB_TOKEN }} --tag-prefix v
+        run: npx prebuild --runtime napi --all --upload ${{ secrets.GITHUB_TOKEN }}
