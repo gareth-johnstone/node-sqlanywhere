@@ -25,7 +25,7 @@ public:
     void Execute();
     void OnOK();
 private:
-    void prepareBindParams(Napi::Array params);
+    // prepareBindParams is now a free function, so it's removed from here.
     Connection* conn_obj;
     std::string sql;
     Napi::Value result;
@@ -41,7 +41,7 @@ public:
     void Execute();
     void OnOK();
 private:
-    void prepareBindParams(Napi::Array params);
+    // prepareBindParams is now a free function, so it's removed from here.
     StmtObject* stmt_obj;
     Napi::Value result;
     std::string error_msg;

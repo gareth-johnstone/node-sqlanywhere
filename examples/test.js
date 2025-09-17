@@ -12,128 +12,254 @@
 
 const util = require('util')
 const assert = require('assert')
+const crypto = require('crypto') // For uniqueidentifier
 require('dotenv').config()
 // Load the compiled addon directly
 const sqlanywhere = require('../build/Release/sqlanywhere.node')
 
-// --- IMPORTANT ---
-// For security, load database credentials from environment variables.
-// You can set these in your shell or in a .env file (excluded from version control).
-// Example (in bash):
-//   export DB_SERVER=your_server
-//   export DB_USER=your_user
-//   export DB_PASSWORD=your_password
-// Never commit real credentials to source code or version control!
+// --- Configuration ---
 const connParams = {
   ServerName: process.env.DB_SERVER || 'database',
   UserID: process.env.DB_USER || 'username',
   Password: process.env.DB_PASSWORD || 'password'
 }
 
-// Create a new connection object
-const client = new sqlanywhere.createConnection()
+const testTableName = 'NAPI_DRIVER_TEST'
+const testProcName = 'GetProductInfo'
+const updateProcName = 'UpdateProductName'
+const multiResultProcName = 'GetMultipleResults'
 
-// --- Promisify the client and statement methods for async/await ---
-const db = {
-  connect: util.promisify(client.connect).bind(client),
-  disconnect: util.promisify(client.disconnect).bind(client),
-  exec: util.promisify(client.exec).bind(client),
-  prepare: util.promisify(client.prepare).bind(client),
-  commit: util.promisify(client.commit).bind(client),
-  rollback: util.promisify(client.rollback).bind(client)
+// --- Utility ---
+function promisifyDb(client) {
+  return {
+    connect: util.promisify(client.connect).bind(client),
+    disconnect: util.promisify(client.disconnect).bind(client),
+    exec: util.promisify(client.exec).bind(client),
+    prepare: util.promisify(client.prepare).bind(client),
+    commit: util.promisify(client.commit).bind(client),
+    rollback: util.promisify(client.rollback).bind(client)
+  }
 }
 
-// Main async function to run all tests
-async function runAllTests() {
-  const testTableName = 'NAPI_DRIVER_TEST'
+// --- Individual Test Functions ---
+
+async function testCreateTable(db) {
+  console.log(`\n[3/12] Creating test table '${testTableName}'...`)
+  await db.exec(`
+      CREATE TABLE ${testTableName} (
+        id_pk INT PRIMARY KEY,
+        c_bigint BIGINT DEFAULT 0,
+        c_binary BINARY(16) DEFAULT NULL,
+        c_bit BIT DEFAULT 0,
+        c_char CHAR(10) DEFAULT '',
+        c_date DATE DEFAULT '1900-01-01',
+        c_decimal DECIMAL(10, 5) DEFAULT 0,
+        c_double DOUBLE DEFAULT 0,
+        c_float FLOAT DEFAULT 0,
+        c_integer INTEGER DEFAULT 0,
+        c_long_binary LONG BINARY DEFAULT NULL,
+        c_long_nvarchar LONG NVARCHAR DEFAULT '',
+        c_long_varchar LONG VARCHAR DEFAULT '',
+        c_numeric NUMERIC(12, 6) DEFAULT 0,
+        c_smallint SMALLINT DEFAULT 0,
+        c_st_geometry ST_GEOMETRY DEFAULT NULL,
+        c_time TIME DEFAULT '00:00:00',
+        c_timestamp TIMESTAMP DEFAULT NOW(),
+        c_timestamp_tz TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        c_tinyint TINYINT DEFAULT 0,
+        c_uniqueidentifier UNIQUEIDENTIFIER DEFAULT NEWID(),
+        c_unsigned_bigint UNSIGNED BIGINT DEFAULT 0,
+        c_unsigned_int UNSIGNED INT DEFAULT 0,
+        c_unsigned_smallint UNSIGNED SMALLINT DEFAULT 0,
+        c_varbinary VARBINARY(20) DEFAULT NULL,
+        c_varchar VARCHAR(100) DEFAULT '',
+        c_xml XML DEFAULT NULL
+      )`)
+  await db.commit()
+  console.log('    Table created.')
+}
+
+async function testInsertAndCommit(db) {
+  console.log('\n[4/12] Testing INSERT and COMMIT...')
+  const uuid = crypto.randomUUID()
+  const wktGeometry = 'POINT (10 20)'
+  const xmlData = '<root><item id="1">test</item></root>'
+
+  const insertSQL = `
+      INSERT INTO ${testTableName} VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?
+      )`
+  const insertParams = [1, 9223372036854775807, Buffer.from('0123456789ABCDEF', 'hex'), 1, 'fixedchar', '2025-09-17', 12345.12345, 1.23456789e10, 1.23e4, 2147483647, Buffer.from('This is a long binary value'), '這是長的NVARCHAR值', 'This is a long varchar value', 987654.123456, 32767, wktGeometry, '21:22:23', '2025-09-17 21:22:23.123', '2025-09-17 21:22:23.456-05:00', 127, uuid, 18446744073709551615n, 4294967295, 65535, Buffer.from('variable binary data'), 'Variable character data', xmlData]
+
+  let affectedRows = await db.exec(
+    insertSQL,
+    insertParams.map((p) => (typeof p === 'bigint' ? p.toString() : p))
+  )
+  assert.strictEqual(affectedRows, 1, 'INSERT should affect 1 row.')
+  await db.commit()
+  console.log('    Data inserted and committed.')
+
+  let result = await db.exec(`SELECT * FROM ${testTableName} WHERE id_pk = 1`)
+  assert.strictEqual(result[0].c_uniqueidentifier.toUpperCase(), uuid.toUpperCase(), 'UNIQUEIDENTIFIER mismatch.')
+  assert.strictEqual(result[0].c_xml, xmlData, 'XML mismatch.')
+  assert.strictEqual(result[0].c_st_geometry.toUpperCase(), wktGeometry.toUpperCase(), 'ST_GEOMETRY mismatch.')
+  console.log('    Data verified after commit.')
+}
+
+async function testRollback(db) {
+  console.log(`\n[5/12] Testing ROLLBACK...`)
+  await db.exec(`INSERT INTO ${testTableName} (id_pk, c_varchar) VALUES (?, ?)`, [2, 'To be rolled back'])
+  await db.rollback()
+  console.log('    Rollback successful.')
+
+  const result = await db.exec(`SELECT count(*) as count FROM ${testTableName} WHERE id_pk = 2`)
+  assert.strictEqual(result[0].count, 0, 'Data should NOT be present after ROLLBACK.')
+  console.log('    Data verified to be absent.')
+}
+
+async function testPreparedStatements(db) {
+  console.log('\n[6/12] Testing Prepared Statements...')
+  const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
+  const stmt = await db.prepare(insertSQL)
+  const stmtExec = util.promisify(stmt.exec).bind(stmt)
+  const stmtDrop = util.promisify(stmt.drop).bind(stmt)
+
+  await stmtExec([3, 'Prepared Statement', 123])
+  await db.commit()
+  console.log('    Prepared INSERT committed.')
+
+  const result = await db.exec(`SELECT c_integer FROM ${testTableName} WHERE id_pk = 3`)
+  assert.strictEqual(result[0].c_integer, 123, 'Prepared statement data mismatch.')
+  console.log('    Prepared statement data verified.')
+
+  await stmtDrop()
+  console.log('    Statement dropped.')
+}
+
+async function testCreateAndExecuteProcedures(db) {
+  console.log(`\n[7/12] Creating and testing procedures...`)
+  await db.exec(`
+      CREATE PROCEDURE ${testProcName}(IN prod_id INT)
+      RESULT (res_varchar VARCHAR(100), res_double DOUBLE)
+      BEGIN SELECT c_varchar, c_double FROM ${testTableName} WHERE id_pk = prod_id; END
+    `)
+  await db.commit()
+  console.log(`    Procedure '${testProcName}' created.`)
+
+  let result = await db.exec(`CALL ${testProcName}(?)`, [1])
+  assert.strictEqual(result[0].res_varchar, 'Variable character data', 'Procedure varchar mismatch.')
+  assert.strictEqual(result[0].res_double, 1.23456789e10, 'Procedure double mismatch.')
+  console.log('    SELECT procedure executed successfully.')
+
+  await db.exec(`
+        CREATE PROCEDURE ${updateProcName}(IN prod_id INT, IN new_name VARCHAR(100))
+        BEGIN UPDATE ${testTableName} SET c_varchar = new_name WHERE id_pk = prod_id; END
+    `)
+  await db.commit()
+  console.log(`    Procedure '${updateProcName}' created.`)
+
+  await db.exec(`CALL ${updateProcName}(?, ?)`, [1, 'Updated First Entry'])
+  await db.commit()
+
+  result = await db.exec(`SELECT c_varchar FROM ${testTableName} WHERE id_pk = 1`)
+  assert.strictEqual(result[0].c_varchar, 'Updated First Entry', 'Procedure data modification failed.')
+  console.log('    UPDATE procedure executed successfully.')
+}
+
+async function testMultipleResultSets(db) {
+  console.log('\n[8/12] Testing multiple result sets...')
+  await db.exec(`
+        CREATE PROCEDURE ${multiResultProcName}()
+        BEGIN
+            SELECT id_pk, c_varchar FROM ${testTableName} WHERE id_pk = 1;
+            SELECT id_pk, c_integer FROM ${testTableName} WHERE id_pk = 3;
+        END
+    `)
+  await db.commit()
+  console.log(`    Procedure '${multiResultProcName}' created.`)
+
+  const stmt = await db.prepare(`CALL ${multiResultProcName}()`)
+  const stmtExec = util.promisify(stmt.exec).bind(stmt)
+  const getMoreResults = util.promisify(stmt.getMoreResults).bind(stmt)
+  const stmtDrop = util.promisify(stmt.drop).bind(stmt)
+
+  const firstResult = await stmtExec()
+  assert.strictEqual(firstResult.length, 1, 'First result set should have one row.')
+  assert.strictEqual(firstResult[0].c_varchar, 'Updated First Entry', 'First result set data mismatch.')
+  console.log('    First result set verified.')
+
+  const secondResult = await getMoreResults()
+  assert.strictEqual(secondResult.length, 1, 'Second result set should have one row.')
+  assert.strictEqual(secondResult[0].c_integer, 123, 'Second result set data mismatch.')
+  console.log('    Second result set verified.')
+
+  try {
+    await getMoreResults()
+    // If this line is reached, the test fails because an error was expected.
+    assert.fail('Expected an error when fetching beyond the last result set, but none was thrown.')
+  } catch (error) {
+    // This is the expected outcome. We verify it's the correct informational message.
+    assert.ok(error.message.includes('Procedure has completed'), `Expected "Procedure has completed" error, but got: ${error.message}`)
+    console.log('    End of result sets confirmed with expected message.')
+  }
+
+  await stmtDrop()
+  console.log('    Statement dropped.')
+}
+
+async function testErrorHandling(db) {
+  console.log('\n[9/12] Testing Error Handling...')
+  try {
+    await db.exec('SELECT * FROM THIS_TABLE_DOES_NOT_EXIST')
+    throw new Error('Query should have failed but it succeeded.')
+  } catch (error) {
+    assert.ok(error.message.includes('not found'), 'Error message should indicate table not found.')
+    console.log('    Successfully caught expected error.')
+  }
+  await db.rollback()
+}
+
+// --- Test Runner ---
+
+async function runTests(db) {
+  await testCreateTable(db)
+  await testInsertAndCommit(db)
+  await testRollback(db)
+  await testPreparedStatements(db)
+  await testCreateAndExecuteProcedures(db)
+  await testMultipleResultSets(db)
+  await testErrorHandling(db)
+}
+
+async function main() {
+  const client = new sqlanywhere.createConnection()
+  const db = promisifyDb(client)
 
   try {
     console.log('--- TEST SUITE START ---')
-    console.log('\n[1/7] Connecting to database...')
+    console.log('\n[1/12] Connecting to database...')
     await db.connect(connParams)
     console.log('    Connection successful!')
 
-    // --- Test 1: DDL and Parameterized INSERT + COMMIT ---
-    console.log(`\n[2/7] Creating test table '${testTableName}'...`)
-    await db.exec(`CREATE TABLE ${testTableName} (id INT PRIMARY KEY, name VARCHAR(100), value DOUBLE)`)
-    console.log('    Table created.')
-
-    console.log('    Inserting data with parameter binding...')
-    const insertSQL = `INSERT INTO ${testTableName} (id, name, value) VALUES (?, ?, ?)`
-    const insertParams = [1, 'First Entry', 123.45]
-    let affectedRows = await db.exec(insertSQL, insertParams)
-    assert.strictEqual(affectedRows, 1, 'First INSERT should affect 1 row.')
-    console.log('    Data inserted. Committing transaction...')
+    console.log('\n[2/12] Cleaning up previous test objects...')
+    await db.exec(`DROP PROCEDURE IF EXISTS ${testProcName}`)
+    await db.exec(`DROP PROCEDURE IF EXISTS ${updateProcName}`)
+    await db.exec(`DROP PROCEDURE IF EXISTS ${multiResultProcName}`)
+    await db.exec(`DROP TABLE IF EXISTS ${testTableName}`)
     await db.commit()
-    console.log('    Commit successful.')
+    console.log('    Cleanup complete.')
 
-    let result = await db.exec(`SELECT name FROM ${testTableName} WHERE id = 1`)
-    assert.strictEqual(result[0].name, 'First Entry', 'Data should be present after COMMIT.')
-    console.log('    Data verified after commit.')
-
-    // --- Test 2: ROLLBACK ---
-    console.log(`\n[3/7] Testing ROLLBACK...`)
-    console.log('    Inserting temporary data...')
-    await db.exec(insertSQL, [2, 'Second Entry (to be rolled back)', 678.9])
-    console.log('    Rolling back transaction...')
-    await db.rollback()
-    console.log('    Rollback successful.')
-
-    result = await db.exec(`SELECT count(*) as count FROM ${testTableName} WHERE id = 2`)
-    assert.strictEqual(result[0].count, 0, 'Data should NOT be present after ROLLBACK.')
-    console.log('    Data verified to be absent after rollback.')
-
-    // --- Test 3: Prepared Statements ---
-    console.log('\n[4/7] Testing Prepared Statements...')
-    const stmt = await db.prepare(insertSQL)
-    const stmtExec = util.promisify(stmt.exec).bind(stmt)
-    const stmtDrop = util.promisify(stmt.drop).bind(stmt)
-
-    console.log('    Executing prepared INSERT...')
-    affectedRows = await stmtExec([3, 'Prepared Statement Entry', 99.0])
-    assert.strictEqual(affectedRows, 1, 'Prepared INSERT should affect 1 row.')
-    await db.commit()
-    console.log('    Prepared INSERT committed.')
-
-    result = await db.exec(`SELECT value FROM ${testTableName} WHERE id = 3`)
-    assert.strictEqual(result[0].value, 99.0, 'Prepared statement data should be present.')
-    console.log('    Prepared statement data verified.')
-
-    console.log('    Dropping prepared statement...')
-    await stmtDrop()
-    console.log('    Statement dropped.')
-
-    // --- Test 4: Error Handling ---
-    console.log('\n[5/7] Testing Error Handling...')
-    try {
-      await db.exec('SELECT * FROM THIS_TABLE_DOES_NOT_EXIST')
-      // If we get here, the test fails
-      throw new Error('Query should have failed but it succeeded.')
-    } catch (error) {
-      assert.ok(error.message.includes('not found'), 'Error message should indicate table not found.')
-      console.log('    Successfully caught expected error from invalid query.')
-    }
-    await db.rollback() // Clear any error state from the connection
+    await runTests(db)
   } catch (error) {
     console.error('\n--- A TEST FAILED ---')
     console.error(error)
   } finally {
-    // --- Cleanup ---
-    console.log('\n[6/7] Cleaning up test table...')
-    try {
-      await db.exec(`DROP TABLE ${testTableName}`)
-      await db.commit()
-      console.log(`    Table '${testTableName}' dropped.`)
-    } catch (cleanupError) {
-      console.warn('    Warning: Could not drop test table. It may not exist.', cleanupError.message)
-    }
-
-    console.log('\n[7/7] Disconnecting...')
+    console.log('\n[12/12] Disconnecting...')
     await db.disconnect()
     console.log('    Disconnected.')
     console.log('\n--- TEST SUITE COMPLETE ---')
   }
 }
 
-// Start the tests
-runAllTests()
+main()

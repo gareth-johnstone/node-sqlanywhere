@@ -1,6 +1,9 @@
 #include "h/async_workers.h"
 #include <cmath>
 
+// Forward declaration to be used in prepareBindParams
+void prepareBindParams(Napi::Array params, std::vector<a_sqlany_bind_param>& bind_params, ExecuteData& param_data);
+
 Napi::Value buildResult(Napi::Env env, a_sqlany_stmt* stmt) {
     int num_cols = api.sqlany_num_cols(stmt);
     if (num_cols <= 0) {
@@ -19,10 +22,44 @@ Napi::Value buildResult(Napi::Env env, a_sqlany_stmt* stmt) {
                 row.Set(info.name, env.Null());
             } else {
                 switch(val.type) {
-                    case A_STRING: row.Set(info.name, Napi::String::New(env, val.buffer, *val.length)); break;
-                    case A_DOUBLE: row.Set(info.name, Napi::Number::New(env, *(double*)val.buffer)); break;
-                    case A_VAL32: row.Set(info.name, Napi::Number::New(env, *(int*)val.buffer)); break;
-                    default: row.Set(info.name, Napi::String::New(env, "Unsupported Type"));
+                    case A_BINARY:
+                        row.Set(info.name, Napi::Buffer<char>::Copy(env, val.buffer, *val.length));
+                        break;
+                    case A_STRING: 
+                        row.Set(info.name, Napi::String::New(env, val.buffer, *val.length)); 
+                        break;
+                    case A_DOUBLE: 
+                        row.Set(info.name, Napi::Number::New(env, *(double*)val.buffer)); 
+                        break;
+                    case A_FLOAT:
+                        row.Set(info.name, Napi::Number::New(env, *(float*)val.buffer)); 
+                        break;
+                    case A_VAL64: 
+                        row.Set(info.name, Napi::Number::New(env, (double)(*(long long*)val.buffer))); 
+                        break;
+                    case A_UVAL64: 
+                        row.Set(info.name, Napi::Number::New(env, (double)(*(unsigned long long*)val.buffer))); 
+                        break;
+                    case A_VAL32: 
+                        row.Set(info.name, Napi::Number::New(env, *(int*)val.buffer)); 
+                        break;
+                    case A_UVAL32: 
+                        row.Set(info.name, Napi::Number::New(env, *(unsigned int*)val.buffer)); 
+                        break;
+                    case A_VAL16: 
+                        row.Set(info.name, Napi::Number::New(env, *(short*)val.buffer)); 
+                        break;
+                    case A_UVAL16: 
+                        row.Set(info.name, Napi::Number::New(env, *(unsigned short*)val.buffer)); 
+                        break;
+                    case A_VAL8: 
+                        row.Set(info.name, Napi::Number::New(env, *(signed char*)val.buffer)); 
+                        break;
+                    case A_UVAL8: 
+                        row.Set(info.name, Napi::Number::New(env, *(unsigned char*)val.buffer)); 
+                        break;
+                    default: 
+                        row.Set(info.name, Napi::String::New(env, "Unsupported Type"));
                 }
             }
         }
@@ -31,15 +68,25 @@ Napi::Value buildResult(Napi::Env env, a_sqlany_stmt* stmt) {
     return results;
 }
 
-// --- Helper: Prepare C++ bind parameters ---
-void ExecWorker::prepareBindParams(Napi::Array params) {
+// --- Helper: Prepare C++ bind parameters (shared logic) ---
+void prepareBindParams(Napi::Array params, std::vector<a_sqlany_bind_param>& bind_params, ExecuteData& param_data) {
     for (uint32_t i = 0; i < params.Length(); i++) {
         a_sqlany_bind_param p;
         memset(&p, 0, sizeof(p));
-        p.direction = DD_INPUT; // Set the parameter direction
+        p.direction = DD_INPUT;
         Napi::Value val = params.Get(i);
 
-        if (val.IsString()) {
+        if (val.IsBuffer()) {
+            Napi::Buffer<char> buffer = val.As<Napi::Buffer<char>>();
+            size_t* len = new size_t(buffer.Length());
+            char* buf = new char[*len];
+            memcpy(buf, buffer.Data(), *len);
+            
+            p.value.buffer = buf;
+            p.value.type = A_BINARY;
+            p.value.length = len;
+            param_data.addString(buf, len);
+        } else if (val.IsString()) {
             std::string str = val.ToString().Utf8Value();
             size_t* len = new size_t(str.length());
             char* buf = new char[*len + 1];
@@ -49,61 +96,99 @@ void ExecWorker::prepareBindParams(Napi::Array params) {
             p.value.type = A_STRING;
             p.value.length = len;
             param_data.addString(buf, len);
-            bind_params.push_back(p);
-
         } else if (val.IsNumber()) {
             double num_val = val.ToNumber().DoubleValue();
-            if (floor(num_val) == num_val) {
-                int* int_val = new int((int)num_val);
-                p.value.buffer = (char*)int_val;
-                p.value.type = A_VAL32;
-                param_data.addInt(int_val);
+            if (floor(num_val) == num_val && num_val < 9007199254740991.0 && num_val > -9007199254740991.0) { // Is a safe integer
+                if (num_val >= -2147483648 && num_val <= 2147483647) {
+                    int* int_val = new int((int)num_val);
+                    p.value.buffer = (char*)int_val;
+                    p.value.type = A_VAL32;
+                    param_data.addInt(int_val);
+                } else {
+                    long long* ll_val = new long long((long long)num_val);
+                    p.value.buffer = (char*)ll_val;
+                    p.value.type = A_VAL64;
+                    param_data.addLongLong(ll_val);
+                }
             } else {
                 double* dbl_val = new double(num_val);
                 p.value.buffer = (char*)dbl_val;
                 p.value.type = A_DOUBLE;
                 param_data.addDouble(dbl_val);
             }
-            bind_params.push_back(p);
+        } else if (val.IsNull() || val.IsUndefined()) {
+             p.value.buffer = NULL;
+             p.value.length = NULL; 
+             p.value.type = A_INVALID_TYPE;
         }
+
+        bind_params.push_back(p);
     }
 }
 
-// --- Helper: Prepare C++ bind parameters ---
-void ExecStmtWorker::prepareBindParams(Napi::Array params) {
-    for (uint32_t i = 0; i < params.Length(); i++) {
-        a_sqlany_bind_param p;
-        memset(&p, 0, sizeof(p));
-        p.direction = DD_INPUT; // Set the parameter direction
-        Napi::Value val = params.Get(i);
 
-        if (val.IsString()) {
-            std::string str = val.ToString().Utf8Value();
-            size_t* len = new size_t(str.length());
-            char* buf = new char[*len + 1];
-            memcpy(buf, str.c_str(), *len + 1);
-            
-            p.value.buffer = buf;
-            p.value.type = A_STRING;
-            p.value.length = len;
-            param_data.addString(buf, len);
-            bind_params.push_back(p);
-
-        } else if (val.IsNumber()) {
-            double num_val = val.ToNumber().DoubleValue();
-            if (floor(num_val) == num_val) {
-                int* int_val = new int((int)num_val);
-                p.value.buffer = (char*)int_val;
-                p.value.type = A_VAL32;
-                param_data.addInt(int_val);
-            } else {
-                double* dbl_val = new double(num_val);
-                p.value.buffer = (char*)dbl_val;
-                p.value.type = A_DOUBLE;
-                param_data.addDouble(dbl_val);
+ExecWorker::ExecWorker(Connection* c, const Napi::Function& cb, std::string s, Napi::Array p)
+    : Napi::AsyncWorker(cb), conn_obj(c), sql(s), result(Env().Undefined()), error_msg("") {
+    prepareBindParams(p, bind_params, param_data);
+}
+void ExecWorker::Execute() {
+    uv_mutex_lock(&conn_obj->conn_mutex);
+    if (bind_params.empty()) {
+        stmt_handle = api.sqlany_execute_direct(conn_obj->conn, sql.c_str());
+    } else {
+        stmt_handle = api.sqlany_prepare(conn_obj->conn, sql.c_str());
+        if(stmt_handle) {
+            for (size_t i = 0; i < bind_params.size(); i++) {
+                if (!api.sqlany_bind_param(stmt_handle, i, &bind_params[i])) {
+                    getErrorMsg(conn_obj->conn, error_msg);
+                    break;
+                }
             }
-            bind_params.push_back(p);
+            if(error_msg.empty() && !api.sqlany_execute(stmt_handle)) {
+                getErrorMsg(conn_obj->conn, error_msg);
+            }
         }
+    }
+    if (!stmt_handle && error_msg.empty()) {
+        getErrorMsg(conn_obj->conn, error_msg);
+    }
+    uv_mutex_unlock(&conn_obj->conn_mutex);
+}
+void ExecWorker::OnOK() {
+    Napi::HandleScope scope(Env());
+    if (stmt_handle) {
+        if(error_msg.empty()) { result = buildResult(Env(), stmt_handle); }
+        api.sqlany_free_stmt(stmt_handle);
+    }
+    if (!error_msg.empty()) { Callback().Call({Napi::Error::New(Env(), error_msg).Value()}); }
+    else { Callback().Call({Env().Null(), result}); }
+}
+
+
+ExecStmtWorker::ExecStmtWorker(StmtObject* s, const Napi::Function& cb, Napi::Array p)
+    : Napi::AsyncWorker(cb), stmt_obj(s), result(Env().Undefined()), error_msg("") {
+    prepareBindParams(p, bind_params, param_data);
+}
+void ExecStmtWorker::Execute() {
+    uv_mutex_lock(&stmt_obj->connection->conn_mutex);
+    for (size_t i = 0; i < bind_params.size(); i++) {
+        if (!api.sqlany_bind_param(stmt_obj->sqlany_stmt, i, &bind_params[i])) {
+            getErrorMsg(stmt_obj->connection->conn, error_msg);
+            break;
+        }
+    }
+    if(error_msg.empty() && !api.sqlany_execute(stmt_obj->sqlany_stmt)) {
+        getErrorMsg(stmt_obj->connection->conn, error_msg);
+    }
+    uv_mutex_unlock(&stmt_obj->connection->conn_mutex);
+}
+void ExecStmtWorker::OnOK() {
+    Napi::HandleScope scope(Env());
+    if (error_msg.empty()) {
+        result = buildResult(Env(), stmt_obj->sqlany_stmt);
+        Callback().Call({Env().Null(), result});
+    } else {
+        Callback().Call({Napi::Error::New(Env(), error_msg).Value()});
     }
 }
 
@@ -160,43 +245,6 @@ void NoParamsWorker::OnOK() {
     else { Callback().Call({Env().Null()}); }
 }
 
-ExecWorker::ExecWorker(Connection* c, const Napi::Function& cb, std::string s, Napi::Array p)
-    : Napi::AsyncWorker(cb), conn_obj(c), sql(s), result(Env().Undefined()), error_msg("") {
-    prepareBindParams(p);
-}
-void ExecWorker::Execute() {
-    uv_mutex_lock(&conn_obj->conn_mutex);
-    if (bind_params.empty()) {
-        stmt_handle = api.sqlany_execute_direct(conn_obj->conn, sql.c_str());
-    } else {
-        stmt_handle = api.sqlany_prepare(conn_obj->conn, sql.c_str());
-        if(stmt_handle) {
-            for (size_t i = 0; i < bind_params.size(); i++) {
-                if (!api.sqlany_bind_param(stmt_handle, i, &bind_params[i])) {
-                    getErrorMsg(conn_obj->conn, error_msg);
-                    break;
-                }
-            }
-            if(error_msg.empty() && !api.sqlany_execute(stmt_handle)) {
-                getErrorMsg(conn_obj->conn, error_msg);
-            }
-        }
-    }
-    if (!stmt_handle && error_msg.empty()) {
-        getErrorMsg(conn_obj->conn, error_msg);
-    }
-    uv_mutex_unlock(&conn_obj->conn_mutex);
-}
-void ExecWorker::OnOK() {
-    Napi::HandleScope scope(Env());
-    if (stmt_handle) {
-        if(error_msg.empty()) { result = buildResult(Env(), stmt_handle); }
-        api.sqlany_free_stmt(stmt_handle);
-    }
-    if (!error_msg.empty()) { Callback().Call({Napi::Error::New(Env(), error_msg).Value()}); }
-    else { Callback().Call({Env().Null(), result}); }
-}
-
 PrepareWorker::PrepareWorker(Connection* c, const Napi::Function& cb, std::string s)
     : Napi::AsyncWorker(cb), conn_obj(c), sql(s), error_msg("") {}
 void PrepareWorker::Execute() {
@@ -213,33 +261,6 @@ void PrepareWorker::OnOK() {
         unwrapped->sqlany_stmt = stmt_handle;
         unwrapped->setConnection(conn_obj);
         Callback().Call({Env().Null(), stmt_obj});
-    } else {
-        Callback().Call({Napi::Error::New(Env(), error_msg).Value()});
-    }
-}
-
-ExecStmtWorker::ExecStmtWorker(StmtObject* s, const Napi::Function& cb, Napi::Array p)
-    : Napi::AsyncWorker(cb), stmt_obj(s), result(Env().Undefined()), error_msg("") {
-    prepareBindParams(p);
-}
-void ExecStmtWorker::Execute() {
-    uv_mutex_lock(&stmt_obj->connection->conn_mutex);
-    for (size_t i = 0; i < bind_params.size(); i++) {
-        if (!api.sqlany_bind_param(stmt_obj->sqlany_stmt, i, &bind_params[i])) {
-            getErrorMsg(stmt_obj->connection->conn, error_msg);
-            break;
-        }
-    }
-    if(error_msg.empty() && !api.sqlany_execute(stmt_obj->sqlany_stmt)) {
-        getErrorMsg(stmt_obj->connection->conn, error_msg);
-    }
-    uv_mutex_unlock(&stmt_obj->connection->conn_mutex);
-}
-void ExecStmtWorker::OnOK() {
-    Napi::HandleScope scope(Env());
-    if (error_msg.empty()) {
-        result = buildResult(Env(), stmt_obj->sqlany_stmt);
-        Callback().Call({Env().Null(), result});
     } else {
         Callback().Call({Napi::Error::New(Env(), error_msg).Value()});
     }
