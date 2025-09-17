@@ -1,4 +1,4 @@
-name: Build Release Binaries
+name: Build and Upload Pre-built Binaries
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
+  build-and-upload:
+    name: Prebuild for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x' # Use a specific LTS for consistency
+          node-version: '22.x'
 
       # Setup for Windows build
       - name: Setup MSBuild and Python for node-gyp
@@ -29,22 +29,19 @@ jobs:
           python-version: '3.10'
       - uses: microsoft/setup-msbuild@v2
         if: matrix.os == 'windows-latest'
-      
+
       # Setup for Linux build
       - name: Install build tools (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y build-essential
 
+      # Install dev dependencies, including 'prebuild'
       - name: Install dependencies
         run: npm install
 
-      - name: Build the addon
-        run: npm run build
-
-      - name: Create Release and Upload Binaries
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            build/Release/sqlanywhere.node
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # This is the key step. 'prebuild' will:
+      # 1. Compile the addon using node-gyp.
+      # 2. Package it into a correctly named .tar.gz file.
+      # 3. Upload it to a draft release on GitHub.
+      - name: Compile, package, and upload binary
+        run: npx prebuild --runtime napi --all --upload ${{ secrets.GITHUB_TOKEN }} --tag-prefix v
