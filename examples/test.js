@@ -12,21 +12,22 @@
 
 const util = require('util')
 const assert = require('assert')
+require('dotenv').config()
 // Load the compiled addon directly
 const sqlanywhere = require('../build/Release/sqlanywhere.node')
 
 // --- IMPORTANT ---
 // For security, load database credentials from environment variables.
 // You can set these in your shell or in a .env file (excluded from version control).
-// Example (in bash): 
+// Example (in bash):
 //   export DB_SERVER=your_server
 //   export DB_USER=your_user
 //   export DB_PASSWORD=your_password
 // Never commit real credentials to source code or version control!
 const connParams = {
-  ServerName: process.env.DB_SERVER || 'database', // Your database server name
-  UserID: process.env.DB_USER || 'username',       // Your user ID
-  Password: process.env.DB_PASSWORD || 'password'  // Your password
+  ServerName: process.env.DB_SERVER || 'database',
+  UserID: process.env.DB_USER || 'username',
+  Password: process.env.DB_PASSWORD || 'password'
 }
 
 // Create a new connection object
