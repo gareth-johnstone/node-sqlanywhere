@@ -3,7 +3,7 @@ name: Build and Upload Pre-built Binaries
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '*.*.*'
 
 jobs:
   build-and-upload:
