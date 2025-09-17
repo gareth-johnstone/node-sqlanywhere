@@ -31,8 +31,8 @@ exec( "rm ./build/Release/sqlanywhere.node", function( error, out, err ) {
                         console.log( "Make sure a C++ tool chain is installed and in the PATH");
 			process.exit( -1 );
 		    }
-		    db = require( "./lib/index" );
-		    conn = db.createConnection();
+		    const db = require( "./lib/index" );
+		    const client = new db.createConnection()
 		    console.log( "Built Binaries!" );
 		    console.log( "Install Complete!" );
 	
