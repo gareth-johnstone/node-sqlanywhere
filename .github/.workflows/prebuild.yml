@@ -1,0 +1,46 @@
+name: Prebuild Binaries
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }} on Node.js ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # Add the LTS versions of Node.js you wish to support
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # On Windows, node-gyp requires extra setup
+      - name: Setup MSBuild and Python for node-gyp
+        if: matrix.os == 'windows-latest'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: microsoft/setup-msbuild@v2
+        if: matrix.os == 'windows-latest'
+      
+      # On Linux, some build tools are required
+      - name: Install build tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y build-essential
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run prebuild to compile and package binaries
+        # The GITHUB_TOKEN is automatically provided by GitHub Actions
+        # --tag-prefix v is needed if your git tags are like "v1.2.3"
+        run: npx prebuild --runtime napi --target ${{ matrix.node-version }} --upload ${{ secrets.GITHUB_TOKEN }} --tag-prefix v

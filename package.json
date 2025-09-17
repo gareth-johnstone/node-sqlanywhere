@@ -14,10 +14,13 @@
     "node-addon-api": "^6.0.0"
   },
   "scripts": {
-    "build": "node build.js",
+    "install": "prebuild-install || node-gyp rebuild",
+    "prebuild": "prebuild --runtime napi --all",
     "test": "node examples/test.js"
   },
   "devDependencies": {
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "prebuild": "^11.0.4",
+    "prebuild-install": "^7.1.1"
   }
 }
