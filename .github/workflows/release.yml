@@ -70,13 +70,31 @@ jobs:
         with:
           path: downloaded-prebuilds
 
-      # 2. Move all binary files into the master prebuilds folder
-      - name: Consolidate Binaries
+      # 2. Consolidate Binaries
+      - name: Consolidate Binaries Safely
         run: |
+          # 1. Create the final destination directory
           mkdir -p prebuilds
-          # Loop through each downloaded artifact folder (prebuilds-windows-latest, prebuilds-ubuntu-latest)
-          # and move its contents into the main prebuilds folder
-          find downloaded-prebuilds -type f -name '*.tar.gz' -exec mv {} prebuilds/ \;
+
+          # 2. Iterate through each platform's downloaded artifact folder
+          for platform_dir in downloaded-prebuilds/*; do
+            # The actual binaries are in a 'prebuilds' subdirectory within the artifact folder
+            SOURCE_DIR="$platform_dir/prebuilds"
+            
+            if [ -d "$SOURCE_DIR" ]; then
+              echo "Moving binaries from $SOURCE_DIR..."
+              # Move the contents (*.tar.gz files) from the source to the final prebuilds/ directory.
+              # This explicitly targets the contents and assumes the file names are unique,
+              # which prebuildify guarantees based on the OS/architecture tag included in the filename.
+              # Example: moves 'sqlanywhere-vX.X.X-napi-v6-win32-x64.tar.gz'
+              # Note: 'mv' may show a warning if the source directory is empty after the move,
+              # but the core file transfer is safe.
+              mv "$SOURCE_DIR"/* prebuilds/
+            fi
+          done
+
+          echo "Final contents of prebuilds directory:"
+          ls prebuilds/
 
       # 3. Commit the new prebuilds to the Git repository
       - name: Commit and Push Binaries
