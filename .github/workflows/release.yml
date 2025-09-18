@@ -135,18 +135,21 @@ jobs:
           # Using 'jq' is a robust way to edit JSON in bash
           jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' package.json > tmp.json && mv tmp.json package.json
 
+          # Ensures package-lock.json is updated to match package.json
           npm install --ignore-scripts
 
           git add package.json package-lock.json
 
           # 3. Commit all staged changes (binaries and package.json)
           git commit -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
+          NEW_COMMIT_HASH=$(git rev-parse HEAD)
 
           # 4. Manually create the Git tag (THIS WAS THE MISSING STEP)
-          git tag "v$NEW_VERSION"
+          echo "Tagging commit $NEW_COMMIT_HASH with v$NEW_VERSION"
+          git tag "v$NEW_VERSION" $NEW_COMMIT_HASH
 
           # 5. Push the commit and the new tag
-          git push --follow-tags
+          git push origin master --follow-tags
           
           # 6. Output the new tag for the release step
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
