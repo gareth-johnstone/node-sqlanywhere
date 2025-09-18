@@ -223,6 +223,7 @@ async function testErrorHandling(db) {
 // --- Test Runner ---
 
 async function runTests(db) {
+  console.time('Total Test Duration')
   await testCreateTable(db)
   await testInsertAndCommit(db)
   await testRollback(db)
@@ -230,6 +231,7 @@ async function runTests(db) {
   await testCreateAndExecuteProcedures(db)
   await testMultipleResultSets(db)
   await testErrorHandling(db)
+  console.timeEnd('Total Test Duration')
 }
 
 async function main() {
