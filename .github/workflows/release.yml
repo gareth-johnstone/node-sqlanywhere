@@ -1,12 +1,11 @@
-name: Build and Upload Pre-built Binaries
+name: Bump Version, Build, Commit, and Release
 
+# This workflow is triggered manually from the Actions tab
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*.*.*'
 
 jobs:
+  # This job builds the binaries first, based on the latest master commit
   build_binaries:
     name: Build Prebuilds (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -36,11 +35,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y build-essential
 
-      # Install dev dependencies, including 'prebuild'
-      - name: Install dependencies
-        run: npm install
-
-      # Force a clean build by removing old artifacts for each OS.
+      # Force a clean build to prevent caching issues
       - name: Clean Old Build Artifacts (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: rm -rf build prebuilds
@@ -48,76 +43,102 @@ jobs:
       - name: Clean Old Build Artifacts (Windows)
         if: matrix.os == 'windows-latest'
         run: Remove-Item -Recurse -Force build, prebuilds -ErrorAction SilentlyContinue
+      
+      - name: Install dependencies
+        run: npm install
 
-      # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
         run: npm run prebuild
 
-      # 2. Upload the entire prebuilds folder as an artifact.
-      # The artifact name must be unique per job.
       - name: Upload Prebuild Artifact
         uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}
           path: prebuilds/
-          
-  # Add a new job to combine and commit the files
-  combine_and_commit:
-    name: Combine and Commit Binaries
+
+  # This job runs after the binaries are built. It combines them, versions,
+  # commits, tags, and creates the final release.
+  combine_and_release:
+    name: Combine, Commit, Tag, and Release
     runs-on: ubuntu-latest
-    # Wait for ALL matrix jobs to complete successfully
     needs: [build_binaries]
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          # IMPORTANT: Fetch full history so we can commit back to the branch
           fetch-depth: 0 
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      # 1. Download all artifacts created by the matrix jobs
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: downloaded-prebuilds
 
-      # 2. Consolidate Binaries
       - name: Consolidate Binaries
         run: |
-          # 1. Start with a completely clean slate.
-          echo "Removing existing prebuilds directory..."
+          echo "Removing existing prebuilds directory if it exists..."
           rm -rf prebuilds
           mkdir prebuilds
-
-          # 2. Loop through each downloaded artifact directory (e.g., downloaded-prebuilds/prebuilds-ubuntu-latest)
-          #    and copy its contents (e.g., the 'linux-x64' folder) into the new 'prebuilds' directory.
           echo "Copying new binaries from downloaded artifacts..."
           for dir in downloaded-prebuilds/*/; do
             cp -r "$dir"* prebuilds/
           done
-
-          # 3. Verify the final result.
           echo "Final consolidated contents of prebuilds directory:"
           ls -R prebuilds/
 
-      # 3. Commit the new prebuilds to the Git repository
-      - name: Commit and Push Binaries
+      - name: Configure Git User
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Stage the prebuilds directory. This is where we force Git to notice the changes.
-          git add prebuilds
-          
-          # Check if there are any staged changes. If the output is empty, skip commit.
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No new changes to binaries found. Skipping commit and push."
+      - name: Check for Changes
+        id: git_status
+        run: |
+          # The "M" status indicates a modified file (existing binary was updated)
+          # The "??" status indicates a new file (binary was created from scratch)
+          if git status --porcelain | grep -E " M |^\?\? "; then
+            echo "changes=true" >> $GITHUB_OUTPUT
           else
-            # 1. Commit the new files on the detached HEAD
-            LATEST_VERSION=$(git describe --tags --abbrev=0)
-            git commit -m "ci: Prebuilt binaries for ${LATEST_VERSION}"
-            
-            # 2. Push the newly created commit (from detached HEAD) directly to the master branch.
-            # NOTE: If your main branch is named 'main', change 'master' below to 'main'.
-            git push origin HEAD:master
+            echo "changes=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Version, Commit, and Tag
+        id: npm_version
+        if: steps.git_status.outputs.changes == 'true'
+        run: |
+          # Stage the prebuilt binaries
+          git add prebuilds
+
+          # Use npm version to bump package.json, create a commit, and tag it.
+          # The commit will include both the package.json change AND the staged binaries.
+          # Use 'minor' or 'major' here if you want to increment a different part of the version.
+          npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
+          
+          # Push the new commit and the new tag to the master branch
+          git push --follow-tags
+          
+          # Output the new tag for the release step
+          echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        if: steps.npm_version.outputs.tag # Only run if a new tag was created
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.npm_version.outputs.tag }}
+          release_name: Release ${{ steps.npm_version.outputs.tag }}
+          body: |
+            Automated release with pre-built binaries for Windows and Linux.
+          draft: false
+          prerelease: false
+
+      - name: No Changes Detected
+        if: steps.git_status.outputs.changes == 'false'
+        run: echo "No changes to binaries found. Skipping version bump and release."
