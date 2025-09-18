@@ -75,24 +75,21 @@ jobs:
       # 2. Consolidate Binaries
       - name: Consolidate Binaries
         run: |
-          # 1. CLEANUP: Delete the existing platform folders checked out by Git.
-          # This prevents the initial "Directory not empty" error.
-          rm -rf prebuilds/linux-x64
-          rm -rf prebuilds/win32-x64
+          # 1. Start with a completely clean slate. This is the most reliable way.
+          echo "Removing existing prebuilds directory..."
+          rm -rf prebuilds
+          mkdir prebuilds
 
-          # 2. Create the parent directory if it's missing (safe)
-          mkdir -p prebuilds
-          
-          # 3. Move the explicit, correct Ubuntu folder.
-          # We know the folder is 'linux-x64'.
-          mv downloaded-prebuilds/prebuilds-ubuntu-latest/linux-x64 prebuilds/
+          # 2. Loop through each downloaded artifact directory (e.g., downloaded-prebuilds/prebuilds-ubuntu-latest)
+          #    and copy its contents (e.g., the 'linux-x64' folder) into the new 'prebuilds' directory.
+          echo "Copying new binaries from downloaded artifacts..."
+          for dir in downloaded-prebuilds/*/; do
+            cp -r "$dir"* prebuilds/
+          done
 
-          # 4. Move the explicit, correct Windows folder.
-          # We know the folder is 'win32-x64'.
-          mv downloaded-prebuilds/prebuilds-windows-latest/win32-x64 prebuilds/
-
+          # 3. Verify the final result.
           echo "Final consolidated contents of prebuilds directory:"
-          ls prebuilds/
+          ls -R prebuilds/
 
       # 3. Commit the new prebuilds to the Git repository
       - name: Commit and Push Binaries
