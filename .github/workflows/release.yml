@@ -77,8 +77,7 @@ jobs:
         run: |
           # Delete the existing platform folders to allow for a clean move operation.
           # This ensures we replace old binaries with the newly built ones.
-          rm -rf prebuilds/linux-x64
-          rm -rf prebuilds/win32-x64
+          rm -rf prebuilds/*
 
           # Create the parent directory if it's missing (always safe)
           mkdir -p prebuilds
@@ -86,8 +85,8 @@ jobs:
           # Move the contents (the platform folders: linux-x64 and win32-x64) 
           # from their downloaded artifact folders into the clean prebuilds/ directory.
           # The asterisk (*) moves the directories themselves.
-          mv downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
-          mv downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
+          mv -f downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
+          mv -f downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
 
           echo "Final consolidated contents of prebuilds directory:"
           ls prebuilds/
