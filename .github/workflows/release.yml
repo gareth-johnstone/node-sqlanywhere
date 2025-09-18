@@ -163,7 +163,7 @@ jobs:
           tag_name: ${{ steps.npm_version.outputs.tag }}
           release_name: Release ${{ steps.npm_version.outputs.tag }}
           body: |
-            Automated release with pre-built binaries for Windows and Linux.
+            Automated release with pre-built binaries for Windows, Linux and macOS.
           draft: false
           prerelease: false
 
