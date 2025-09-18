@@ -110,7 +110,7 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
       
-      # Stage the new/modified binaries in their own dedicated step.
+      # THIS IS THE KEY FIX: Stage the binaries in their own step first.
       - name: Stage Binary Changes
         if: steps.git_status.outputs.changes == 'true'
         run: git add prebuilds
@@ -119,24 +119,14 @@ jobs:
         id: npm_version
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          # Manually update the version number as (npm version doesnt work, so manually write it back to package.json)
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-
-          # Update package.json with the new version
-          jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' package.json > tmp.json && mv tmp.json package.json
-          echo "Updated version to $NEW_VERSION"
-          git add package.json
-
-          # Commit the changes
-          git commit -m "ci: prebuild binaries and bump version to $NEW_VERSION"
-
-          # Push the new commit and the new tag
+          # Now that the binaries are staged, the working directory is clean
+          # from npm's perspective. It will now succeed.
+          npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
+          
+          # Push the commit and the new tag created by npm version
           git push --follow-tags
           
-          # Output the new tag for the release step
+          # Output the newly created tag name for the release step
           echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
