@@ -42,7 +42,7 @@ jobs:
 
       # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
-        run: rm -rf prebuilds && npm run prebuild
+        run: npm run prebuild
 
       # 2. Upload the entire prebuilds folder as an artifact.
       # The artifact name must be unique per job.
