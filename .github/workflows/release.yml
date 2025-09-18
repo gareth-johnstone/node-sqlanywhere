@@ -70,17 +70,17 @@ jobs:
         with:
           path: downloaded-prebuilds
 
-# 2. Consolidate Binaries
+      # 2. Consolidate Binaries
       - name: Consolidate Binaries Safely
         run: |
           # 1. Create the final destination directory
           mkdir -p prebuilds
           
-          # 2. Move all *.tar.gz files from the two downloaded artifact folders
-          # The pattern downloaded-prebuilds/*/* expands to:
-          # downloaded-prebuilds/prebuilds-ubuntu-latest/sqlanywhere-vX.X.X-linux-x64.tar.gz
-          # downloaded-prebuilds/prebuilds-windows-latest/sqlanywhere-vX.X.X-win32-x64.tar.gz
-          mv downloaded-prebuilds/*/*/* prebuilds/
+          # 2. Move contents of the two downloaded artifact folders into prebuilds/
+          # This should move the 'linux-x64' folder and the 'win32-x64' folder
+          # into the root 'prebuilds/' folder.
+          mv downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
+          mv downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
 
           echo "Final contents of prebuilds directory:"
           ls prebuilds/
