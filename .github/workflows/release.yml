@@ -6,13 +6,13 @@ on:
       - '*.*.*'
 
 jobs:
-  build-and-upload:
-    name: Prebuild for ${{ matrix.os }}
+  build_binaries:
+    name: Build Prebuilds (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-
+    
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +39,57 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 1. Compile the addon using node-gyp.
-      # 2. Package it into a correctly named .tar.gz file.
-      # 3. Upload it to a draft release on GitHub.
-      - name: Compile, package, and upload binary
-        run: npx prebuild --runtime napi --all --upload ${{ secrets.GITHUB_TOKEN }}
+      # 1. Generate the OS-specific binary in prebuilds/
+      - name: Run prebuildify
+        run: npm run prebuild
+
+      # 2. Upload the entire prebuilds folder as an artifact.
+      # The artifact name must be unique per job.
+      - name: Upload Prebuild Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-${{ matrix.os }}
+          path: prebuilds/
+          
+  # Add a new job to combine and commit the files
+  combine_and_commit:
+    name: Combine and Commit Binaries
+    runs-on: ubuntu-latest
+    # Wait for ALL matrix jobs to complete successfully
+    needs: [build_binaries]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A token is required to push changes back to the repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 1. Download all artifacts created by the matrix jobs
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-prebuilds
+
+      # 2. Move all binary files into the master prebuilds folder
+      - name: Consolidate Binaries
+        run: |
+          mkdir -p prebuilds
+          # Loop through each downloaded artifact folder (prebuilds-windows-latest, prebuilds-ubuntu-latest)
+          # and move its contents into the main prebuilds folder
+          find downloaded-prebuilds -type f -name '*.tar.gz' -exec mv {} prebuilds/ \;
+
+      # 3. Commit the new prebuilds to the Git repository
+      - name: Commit and Push Binaries
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          # Check if there are any new or modified files in prebuilds/
+          if git diff --quiet prebuilds; then
+            echo "No new binaries to commit."
+          else
+            git add prebuilds
+            # Use the latest tag from the repo history for the commit message
+            LATEST_VERSION=$(git describe --tags --abbrev=0)
+            git commit -m "ci: Prebuilt binaries for ${LATEST_VERSION}"
+            git push
+          fi
