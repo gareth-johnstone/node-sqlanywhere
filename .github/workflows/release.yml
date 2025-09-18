@@ -77,7 +77,7 @@ jobs:
         run: |
           # Delete the existing platform folders to allow for a clean move operation.
           # This ensures we replace old binaries with the newly built ones.
-          rm -rf prebuilds/*
+          rm -rf prebuilds
 
           # Create the parent directory if it's missing (always safe)
           mkdir -p prebuilds

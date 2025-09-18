@@ -274,9 +274,11 @@ async function main() {
     console.error('\n--- A TEST FAILED ---')
     console.error(error)
   } finally {
+    console.time('Disconnection Duration')
     console.log('\n[10/10] Disconnecting...')
     await db.disconnect()
     console.log('    Disconnected.')
+    console.timeEnd('Disconnection Duration')
     console.log('\n--- TEST SUITE COMPLETE ---')
   }
   console.timeEnd('Total Test Duration')
