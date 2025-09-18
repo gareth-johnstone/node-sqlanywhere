@@ -110,7 +110,6 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
       
-      # --- THIS IS THE KEY CHANGE ---
       # Stage the new/modified binaries in their own dedicated step.
       - name: Stage Binary Changes
         if: steps.git_status.outputs.changes == 'true'
@@ -120,10 +119,13 @@ jobs:
         id: npm_version
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          # Now that binaries are staged, npm version will only see the upcoming
-          # change to package.json and will proceed correctly.
-          npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
-          
+          # Manually update the version number as (npm version patch isnt working here)
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+          VERSION_PARTS[2]=$((VERSION_PARTS[2]+1))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+          npm version "$NEW_VERSION" -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
+
           # Push the new commit and the new tag
           git push --follow-tags
           
