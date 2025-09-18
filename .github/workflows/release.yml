@@ -40,9 +40,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Force a clean build by removing old artifacts.
-      - name: Clean Old Build Artifacts
+      # Force a clean build by removing old artifacts for each OS.
+      - name: Clean Old Build Artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: rm -rf build prebuilds
+
+      - name: Clean Old Build Artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        run: rd /s /q build prebuilds
 
       # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
