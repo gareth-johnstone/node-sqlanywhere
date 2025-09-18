@@ -17,12 +17,11 @@
   "scripts": {
     "install": "node-gyp-build",
     "build": "node build.js",
-    "test": "node examples/test.js",
+    "test": "echo cd to `examples` and run `npm test`",
     "prebuild": "prebuildify --napi",
-    "release": "npm version patch && git push --follow-tags"
+    "release": "echo This is handled by GitHub Actions."
   },
   "devDependencies": {
-    "dotenv": "^17.2.2",
     "prebuildify": "^6.0.1"
   },
   "binary": {

@@ -120,9 +120,9 @@ This driver provides comprehensive support for a wide range of SQL Anywhere data
 
 The project includes a comprehensive test suite that validates all driver functionality against a live database.
 
-1. **Configure Credentials**: Copy the `.env.sample` file to a new file named `.env` and fill in your database connection details.
+1. **Configure Credentials**: Copy the `examples/.env.sample` file to a new file named `examples/.env` and fill in your database connection details.
 
-2. **Run Tests**: Execute the following command from the project root:
+2. **Run Tests**: Execute the following command from the examples directory:
 
     ```sh
     npm run test

@@ -1,0 +1,17 @@
+{
+  "name": "sqlanywhere-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test.js",
+  "scripts": {
+    "prestart": "npm install",
+    "pretest": "npm install",
+    "start": "node test.js",
+    "test": "node test.js"
+  },
+  "author": "Gareth Johnstone",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.2"
+  }
+}
