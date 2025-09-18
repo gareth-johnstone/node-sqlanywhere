@@ -32,7 +32,7 @@ jobs:
 
       # Setup for Linux build
       - name: Install build tools (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: sudo apt-get install -y build-essential
 
       # Setup for macOS build
@@ -43,7 +43,7 @@ jobs:
 
       # Force a clean build to prevent caching issues
       - name: Clean Old Build Artifacts (Linux & macOS)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        if: matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-latest'
         run: rm -rf build prebuilds
 
       - name: Clean Old Build Artifacts (Windows)
@@ -120,50 +120,40 @@ jobs:
         if: steps.git_status.outputs.changes == 'true'
         run: git add prebuilds
 
-      - name: Version, Commit, and Tag
-        id: npm_version
+      - name: Version, Commit, and Push
+        id: version_and_commit
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          # 1. Manually get the current version and calculate the next patch version
+          git add prebuilds
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
           echo "Bumping version to $NEW_VERSION"
-
-          # 2. Update package.json with the new version and stage it
-          # Using 'jq' is a robust way to edit JSON in bash
           jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' package.json > tmp.json && mv tmp.json package.json
-
-          # Ensures package-lock.json is updated to match package.json
           npm install --ignore-scripts
-
           git add package.json package-lock.json
-
-          # 3. Commit all staged changes (binaries and package.json)
           git commit -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
-          NEW_COMMIT_HASH=$(git rev-parse HEAD)
+          git push
+          echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
-          # 4. Manually create the Git tag (THIS WAS THE MISSING STEP)
-          echo "Tagging commit $NEW_COMMIT_HASH with v$NEW_VERSION"
-          git tag "v$NEW_VERSION" $NEW_COMMIT_HASH
-
-          # 5. Push the commit and the new tag
-          git push origin master --follow-tags
-          
-          # 6. Output the new tag for the release step
-          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+      - name: Create Git Tag
+        if: steps.version_and_commit.outputs.new_tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          custom_tag: ${{ steps.version_and_commit.outputs.new_tag }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Create GitHub Release
-        if: steps.npm_version.outputs.tag
+        if: steps.version_and_commit.outputs.new_tag
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.npm_version.outputs.tag }}
-          release_name: Release ${{ steps.npm_version.outputs.tag }}
+          tag_name: ${{ steps.version_and_commit.outputs.new_tag }}
+          release_name: Release ${{ steps.version_and_commit.outputs.new_tag }}
           body: |
-            Automated release with pre-built binaries for Windows, Linux and macOS.
+            Automated release with pre-built binaries.
           draft: false
           prerelease: false
 
