@@ -47,7 +47,7 @@ jobs:
 
       - name: Clean Old Build Artifacts (Windows)
         if: matrix.os == 'windows-latest'
-        run: rd /s /q build prebuilds
+        run: Remove-Item -Recurse -Force build, prebuilds -ErrorAction SilentlyContinue
 
       # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
