@@ -75,18 +75,22 @@ jobs:
       # 2. Consolidate Binaries
       - name: Consolidate Binaries
         run: |
-          # Delete the existing platform folders to allow for a clean move operation.
-          # This ensures we replace old binaries with the newly built ones.
-          rm -rf prebuilds
-
-          # Create the parent directory if it's missing (always safe)
+          # 1. Create the root directory if it does not exist.
           mkdir -p prebuilds
+
+          # 2. DELETE THE SPECIFIC PLATFORM FOLDERS.
+          # This explicitly clears the old directories checked out by Git 
+          # and prevents the "cannot overwrite" conflict for the move command.
+          rm -rf prebuilds/linux-x64
+          rm -rf prebuilds/win32-x64
+
+          # 3. Move the contents of the Ubuntu artifact into the clean prebuilds/ directory.
+          # This creates the 'prebuilds/linux-x64' folder.
+          mv downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
           
-          # Move the contents (the platform folders: linux-x64 and win32-x64) 
-          # from their downloaded artifact folders into the clean prebuilds/ directory.
-          # The asterisk (*) moves the directories themselves.
-          mv -f downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
-          mv -f downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
+          # 4. Move the contents of the Windows artifact into the prebuilds/ directory.
+          # This creates the 'prebuilds/win32-x64' folder without conflict.
+          mv downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
 
           echo "Final consolidated contents of prebuilds directory:"
           ls prebuilds/
