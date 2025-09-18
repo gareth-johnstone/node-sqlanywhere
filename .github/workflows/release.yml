@@ -61,9 +61,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # A token is required to push changes back to the repo
+          # IMPORTANT: Fetch full history so we can commit back to the branch
+          fetch-depth: 0 
           token: ${{ secrets.GITHUB_TOKEN }}
-
+          
       # 1. Download all artifacts created by the matrix jobs
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -71,18 +72,17 @@ jobs:
           path: downloaded-prebuilds
 
       # 2. Consolidate Binaries
-      - name: Consolidate Binaries Safely
+      - name: Consolidate Binaries
         run: |
           # 1. Create the final destination directory
           mkdir -p prebuilds
           
-          # 2. Move contents of the two downloaded artifact folders into prebuilds/
-          # This should move the 'linux-x64' folder and the 'win32-x64' folder
-          # into the root 'prebuilds/' folder.
+          # 2. Move the contents (the platform folders: linux-x64, win32-x64) 
+          # from their downloaded artifact folders into the clean prebuilds/ directory.
           mv downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
           mv downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
 
-          echo "Final contents of prebuilds directory:"
+          echo "Final consolidated contents of prebuilds directory:"
           ls prebuilds/
 
       # 3. Commit the new prebuilds to the Git repository
@@ -90,13 +90,24 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          # Check if there are any new or modified files in prebuilds/
-          if git diff --quiet prebuilds; then
-            echo "No new binaries to commit."
-          else
-            git add prebuilds
-            # Use the latest tag from the repo history for the commit message
-            LATEST_VERSION=$(git describe --tags --abbrev=0)
+          
+          # Stage the prebuilds directory.
+          git add prebuilds
+          
+          # Fetch and checkout the branch the tag originated from. 
+          # Assuming the source branch is 'main'. You may need to change 'main' to 'master'.
+          git fetch origin ${{ github.ref_name }}
+          git checkout ${{ github.ref_name }}
+
+          # Check if there are any staged changes. If not, git commit will fail.
+          # We run the commit and use '|| true' to prevent the overall step from failing
+          # if the binaries were identical (nothing to commit).
+          LATEST_VERSION=$(git describe --tags --abbrev=0)
+          
+          # Force a push, but only if there are actual changes staged (binaries exist and are new)
+          if [ -n "$(git status --porcelain)" ]; then
             git commit -m "ci: Prebuilt binaries for ${LATEST_VERSION}"
             git push
+          else
+            echo "No new changes to binaries found. Skipping commit and push."
           fi
