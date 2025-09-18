@@ -110,7 +110,7 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
       
-      # THIS IS THE KEY FIX: Stage the binaries in their own step first.
+      # Stage the new/modified binaries in their own dedicated step.
       - name: Stage Binary Changes
         if: steps.git_status.outputs.changes == 'true'
         run: git add prebuilds
@@ -119,15 +119,29 @@ jobs:
         id: npm_version
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          # Now that the binaries are staged, the working directory is clean
-          # from npm's perspective. It will now succeed.
-          npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
-          
-          # Push the commit and the new tag created by npm version
+          # 1. Manually get the current version and calculate the next patch version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          echo "Bumping version to $NEW_VERSION"
+
+          # 2. Update package.json with the new version and stage it
+          # Using 'jq' is a robust way to edit JSON in bash
+          jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' package.json > tmp.json && mv tmp.json package.json
+          git add package.json
+
+          # 3. Commit all staged changes (binaries and package.json)
+          git commit -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
+
+          # 4. Manually create the Git tag (THIS WAS THE MISSING STEP)
+          git tag "v$NEW_VERSION"
+
+          # 5. Push the commit and the new tag
           git push --follow-tags
           
-          # Output the newly created tag name for the release step
-          echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+          # 6. Output the new tag for the release step
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
         if: steps.npm_version.outputs.tag
