@@ -80,7 +80,7 @@ jobs:
           # The pattern downloaded-prebuilds/*/* expands to:
           # downloaded-prebuilds/prebuilds-ubuntu-latest/sqlanywhere-vX.X.X-linux-x64.tar.gz
           # downloaded-prebuilds/prebuilds-windows-latest/sqlanywhere-vX.X.X-win32-x64.tar.gz
-          mv downloaded-prebuilds/*/* prebuilds/
+          mv downloaded-prebuilds/*/*/* prebuilds/
 
           echo "Final contents of prebuilds directory:"
           ls prebuilds/
