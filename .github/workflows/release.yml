@@ -134,7 +134,10 @@ jobs:
           # 2. Update package.json with the new version and stage it
           # Using 'jq' is a robust way to edit JSON in bash
           jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' package.json > tmp.json && mv tmp.json package.json
-          git add package.json
+
+          npm install --ignore-scripts
+
+          git add package.json package-lock.json
 
           # 3. Commit all staged changes (binaries and package.json)
           git commit -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
