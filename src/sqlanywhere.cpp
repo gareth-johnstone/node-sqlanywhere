@@ -7,6 +7,7 @@
 #include "h/stmt.h"
 
 // Global variables
+const char* const BUILD_TIMESTAMP = "2025-09-18_17:37:00";
 SQLAnywhereInterface api;
 unsigned openConnections = 0;
 uv_mutex_t api_mutex;
