@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        # os: [ubuntu-latest, windows-latest]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
     
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +36,15 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y build-essential
 
+      # Setup for macOS build
+      - name: Install build tools (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          xcode-select --install || echo "Xcode Command Line Tools already installed"
+
       # Force a clean build to prevent caching issues
-      - name: Clean Old Build Artifacts (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Clean Old Build Artifacts (Linux & macOS)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run: rm -rf build prebuilds
 
       - name: Clean Old Build Artifacts (Windows)
@@ -46,7 +52,7 @@ jobs:
         run: Remove-Item -Recurse -Force build, prebuilds -ErrorAction SilentlyContinue
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --ignore-scripts
 
       - name: Run prebuildify
         run: npm run prebuild
