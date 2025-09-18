@@ -70,28 +70,17 @@ jobs:
         with:
           path: downloaded-prebuilds
 
-      # 2. Consolidate Binaries
+# 2. Consolidate Binaries
       - name: Consolidate Binaries Safely
         run: |
           # 1. Create the final destination directory
           mkdir -p prebuilds
-
-          # 2. Iterate through each platform's downloaded artifact folder
-          for platform_dir in downloaded-prebuilds/*; do
-            # The actual binaries are in a 'prebuilds' subdirectory within the artifact folder
-            SOURCE_DIR="$platform_dir/prebuilds"
-            
-            if [ -d "$SOURCE_DIR" ]; then
-              echo "Moving binaries from $SOURCE_DIR..."
-              # Move the contents (*.tar.gz files) from the source to the final prebuilds/ directory.
-              # This explicitly targets the contents and assumes the file names are unique,
-              # which prebuildify guarantees based on the OS/architecture tag included in the filename.
-              # Example: moves 'sqlanywhere-vX.X.X-napi-v6-win32-x64.tar.gz'
-              # Note: 'mv' may show a warning if the source directory is empty after the move,
-              # but the core file transfer is safe.
-              mv "$SOURCE_DIR"/* prebuilds/
-            fi
-          done
+          
+          # 2. Move all *.tar.gz files from the two downloaded artifact folders
+          # The pattern downloaded-prebuilds/*/* expands to:
+          # downloaded-prebuilds/prebuilds-ubuntu-latest/sqlanywhere-vX.X.X-linux-x64.tar.gz
+          # downloaded-prebuilds/prebuilds-windows-latest/sqlanywhere-vX.X.X-win32-x64.tar.gz
+          mv downloaded-prebuilds/*/* prebuilds/
 
           echo "Final contents of prebuilds directory:"
           ls prebuilds/
