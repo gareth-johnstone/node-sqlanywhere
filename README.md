@@ -4,7 +4,7 @@ A modern, high-performance Node.js driver for [SAP SQL Anywhere](https://www.sap
 
 This driver is built using N-API, ensuring a stable and future-proof interface that is independent of the underlying JavaScript engine. It is fully `async/await` compatible, providing a clean and modern developer experience.
 
-[![NPM](https://nodei.co/npm/@iqx-limited/sqlanywhere.svg?compact=true)](https://nodei.co/npm/@iqx-limited/sqlanywheresqlanywhere/)
+[![NPM](https://nodei.co/npm/@iqx-limited/sqlanywhere.svg?compact=true)](https://nodei.co/npm/@iqx-limited/sqlanywhere/)
 
 ## Prerequisites
 
