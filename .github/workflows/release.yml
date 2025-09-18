@@ -1,6 +1,7 @@
 name: Build and Upload Pre-built Binaries
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - '*.*.*'
