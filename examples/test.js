@@ -44,7 +44,7 @@ function promisifyDb(client) {
 // --- Individual Test Functions ---
 
 async function testCreateTable(db) {
-  console.log(`\n[3/12] Creating test table '${testTableName}'...`)
+  console.log(`\n[3/10] Creating test table '${testTableName}'...`)
   await db.exec(`
       CREATE TABLE ${testTableName} (
         id_pk INT PRIMARY KEY,
@@ -80,7 +80,7 @@ async function testCreateTable(db) {
 }
 
 async function testInsertAndCommit(db) {
-  console.log('\n[4/12] Testing INSERT and COMMIT...')
+  console.log('\n[4/10] Testing INSERT and COMMIT...')
   const uuid = crypto.randomUUID()
   const wktGeometry = 'POINT (10 20)'
   const xmlData = '<root><item id="1">test</item></root>'
@@ -108,7 +108,7 @@ async function testInsertAndCommit(db) {
 }
 
 async function testRollback(db) {
-  console.log(`\n[5/12] Testing ROLLBACK...`)
+  console.log(`\n[5/10] Testing ROLLBACK...`)
   await db.exec(`INSERT INTO ${testTableName} (id_pk, c_varchar) VALUES (?, ?)`, [2, 'To be rolled back'])
   await db.rollback()
   console.log('    Rollback successful.')
@@ -119,7 +119,7 @@ async function testRollback(db) {
 }
 
 async function testPreparedStatements(db) {
-  console.log('\n[6/12] Testing Prepared Statements...')
+  console.log('\n[6/10] Testing Prepared Statements...')
   const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
   const stmt = await db.prepare(insertSQL)
   const stmtExec = util.promisify(stmt.exec).bind(stmt)
@@ -138,7 +138,7 @@ async function testPreparedStatements(db) {
 }
 
 async function testCreateAndExecuteProcedures(db) {
-  console.log(`\n[7/12] Creating and testing procedures...`)
+  console.log(`\n[7/10] Creating and testing procedures...`)
   await db.exec(`
       CREATE PROCEDURE ${testProcName}(IN prod_id INT)
       RESULT (res_varchar VARCHAR(100), res_double DOUBLE)
@@ -168,7 +168,7 @@ async function testCreateAndExecuteProcedures(db) {
 }
 
 async function testMultipleResultSets(db) {
-  console.log('\n[8/12] Testing multiple result sets...')
+  console.log('\n[8/10] Testing multiple result sets...')
   await db.exec(`
         CREATE PROCEDURE ${multiResultProcName}()
         BEGIN
@@ -209,7 +209,7 @@ async function testMultipleResultSets(db) {
 }
 
 async function testErrorHandling(db) {
-  console.log('\n[9/12] Testing Error Handling...')
+  console.log('\n[9/10] Testing Error Handling...')
   try {
     await db.exec('SELECT * FROM THIS_TABLE_DOES_NOT_EXIST')
     throw new Error('Query should have failed but it succeeded.')
@@ -238,11 +238,11 @@ async function main() {
 
   try {
     console.log('--- TEST SUITE START ---')
-    console.log('\n[1/12] Connecting to database...')
+    console.log('\n[1/10] Connecting to database...')
     await db.connect(connParams)
     console.log('    Connection successful!')
 
-    console.log('\n[2/12] Cleaning up previous test objects...')
+    console.log('\n[2/10] Cleaning up previous test objects...')
     await db.exec(`DROP PROCEDURE IF EXISTS ${testProcName}`)
     await db.exec(`DROP PROCEDURE IF EXISTS ${updateProcName}`)
     await db.exec(`DROP PROCEDURE IF EXISTS ${multiResultProcName}`)
@@ -255,7 +255,7 @@ async function main() {
     console.error('\n--- A TEST FAILED ---')
     console.error(error)
   } finally {
-    console.log('\n[12/12] Disconnecting...')
+    console.log('\n[10/10] Disconnecting...')
     await db.disconnect()
     console.log('    Disconnected.')
     console.log('\n--- TEST SUITE COMPLETE ---')
