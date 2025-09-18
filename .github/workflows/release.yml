@@ -11,7 +11,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        # os: [ubuntu-latest, windows-latest]
     
     steps:
       - uses: actions/checkout@v4
@@ -108,14 +109,25 @@ jobs:
           else
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
+      
+      # --- THIS IS THE KEY CHANGE ---
+      # Stage the new/modified binaries in their own dedicated step.
+      - name: Stage Binary Changes
+        if: steps.git_status.outputs.changes == 'true'
+        run: git add prebuilds
 
       - name: Version, Commit, and Tag
         id: npm_version
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          git add prebuilds
+          # Now that binaries are staged, npm version will only see the upcoming
+          # change to package.json and will proceed correctly.
           npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
+          
+          # Push the new commit and the new tag
           git push --follow-tags
+          
+          # Output the new tag for the release step
           echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
