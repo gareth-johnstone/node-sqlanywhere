@@ -28,5 +28,8 @@
     "napi_versions": [
       6
     ]
+  },
+  "volta": {
+    "node": "22.19.0"
   }
 }
