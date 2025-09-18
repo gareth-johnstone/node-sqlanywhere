@@ -42,7 +42,7 @@ jobs:
 
       # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
-        run: npm run prebuild
+        run: rm -rf prebuilds && npm run prebuild
 
       # 2. Upload the entire prebuilds folder as an artifact.
       # The artifact name must be unique per job.
@@ -75,22 +75,21 @@ jobs:
       # 2. Consolidate Binaries
       - name: Consolidate Binaries
         run: |
-          # 1. Create the root directory if it does not exist.
-          mkdir -p prebuilds
-
-          # 2. DELETE THE SPECIFIC PLATFORM FOLDERS.
-          # This explicitly clears the old directories checked out by Git 
-          # and prevents the "cannot overwrite" conflict for the move command.
+          # 1. CLEANUP: Delete the existing platform folders checked out by Git.
+          # This prevents the initial "Directory not empty" error.
           rm -rf prebuilds/linux-x64
           rm -rf prebuilds/win32-x64
 
-          # 3. Move the contents of the Ubuntu artifact into the clean prebuilds/ directory.
-          # This creates the 'prebuilds/linux-x64' folder.
-          mv downloaded-prebuilds/prebuilds-ubuntu-latest/* prebuilds/
+          # 2. Create the parent directory if it's missing (safe)
+          mkdir -p prebuilds
           
-          # 4. Move the contents of the Windows artifact into the prebuilds/ directory.
-          # This creates the 'prebuilds/win32-x64' folder without conflict.
-          mv downloaded-prebuilds/prebuilds-windows-latest/* prebuilds/
+          # 3. Move the explicit, correct Ubuntu folder.
+          # We know the folder is 'linux-x64'.
+          mv downloaded-prebuilds/prebuilds-ubuntu-latest/linux-x64 prebuilds/
+
+          # 4. Move the explicit, correct Windows folder.
+          # We know the folder is 'win32-x64'.
+          mv downloaded-prebuilds/prebuilds-windows-latest/win32-x64 prebuilds/
 
           echo "Final consolidated contents of prebuilds directory:"
           ls prebuilds/
