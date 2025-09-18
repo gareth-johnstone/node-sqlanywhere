@@ -40,6 +40,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Force a clean build by removing old artifacts.
+      - name: Clean Old Build Artifacts
+        run: rm -rf build prebuilds
+
       # 1. Generate the OS-specific binary in prebuilds/
       - name: Run prebuildify
         run: npm run prebuild
@@ -75,7 +79,7 @@ jobs:
       # 2. Consolidate Binaries
       - name: Consolidate Binaries
         run: |
-          # 1. Start with a completely clean slate. This is the most reliable way.
+          # 1. Start with a completely clean slate.
           echo "Removing existing prebuilds directory..."
           rm -rf prebuilds
           mkdir prebuilds
