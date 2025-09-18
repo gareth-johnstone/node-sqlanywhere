@@ -44,6 +44,7 @@ function promisifyDb(client) {
 // --- Individual Test Functions ---
 
 async function testCreateTable(db) {
+  console.time('Create Table Duration')
   console.log(`\n[3/10] Creating test table '${testTableName}'...`)
   await db.exec(`
       CREATE TABLE ${testTableName} (
@@ -77,9 +78,11 @@ async function testCreateTable(db) {
       )`)
   await db.commit()
   console.log('    Table created.')
+  console.timeEnd('Create Table Duration')
 }
 
 async function testInsertAndCommit(db) {
+  console.time('Insert and Commit Duration')
   console.log('\n[4/10] Testing INSERT and COMMIT...')
   const uuid = crypto.randomUUID()
   const wktGeometry = 'POINT (10 20)'
@@ -105,9 +108,11 @@ async function testInsertAndCommit(db) {
   assert.strictEqual(result[0].c_xml, xmlData, 'XML mismatch.')
   assert.strictEqual(result[0].c_st_geometry.toUpperCase(), wktGeometry.toUpperCase(), 'ST_GEOMETRY mismatch.')
   console.log('    Data verified after commit.')
+  console.timeEnd('Insert and Commit Duration')
 }
 
 async function testRollback(db) {
+  console.time('Rollback Duration')
   console.log(`\n[5/10] Testing ROLLBACK...`)
   await db.exec(`INSERT INTO ${testTableName} (id_pk, c_varchar) VALUES (?, ?)`, [2, 'To be rolled back'])
   await db.rollback()
@@ -116,9 +121,11 @@ async function testRollback(db) {
   const result = await db.exec(`SELECT count(*) as count FROM ${testTableName} WHERE id_pk = 2`)
   assert.strictEqual(result[0].count, 0, 'Data should NOT be present after ROLLBACK.')
   console.log('    Data verified to be absent.')
+  console.timeEnd('Rollback Duration')
 }
 
 async function testPreparedStatements(db) {
+  console.time('Prepared Statements Duration')
   console.log('\n[6/10] Testing Prepared Statements...')
   const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
   const stmt = await db.prepare(insertSQL)
@@ -135,9 +142,11 @@ async function testPreparedStatements(db) {
 
   await stmtDrop()
   console.log('    Statement dropped.')
+  console.timeEnd('Prepared Statements Duration')
 }
 
 async function testCreateAndExecuteProcedures(db) {
+  console.time('Create and Execute Procedures Duration')
   console.log(`\n[7/10] Creating and testing procedures...`)
   await db.exec(`
       CREATE PROCEDURE ${testProcName}(IN prod_id INT)
@@ -165,9 +174,11 @@ async function testCreateAndExecuteProcedures(db) {
   result = await db.exec(`SELECT c_varchar FROM ${testTableName} WHERE id_pk = 1`)
   assert.strictEqual(result[0].c_varchar, 'Updated First Entry', 'Procedure data modification failed.')
   console.log('    UPDATE procedure executed successfully.')
+  console.timeEnd('Create and Execute Procedures Duration')
 }
 
 async function testMultipleResultSets(db) {
+  console.time('Multiple Result Sets Duration')
   console.log('\n[8/10] Testing multiple result sets...')
   await db.exec(`
         CREATE PROCEDURE ${multiResultProcName}()
@@ -206,9 +217,11 @@ async function testMultipleResultSets(db) {
 
   await stmtDrop()
   console.log('    Statement dropped.')
+  console.timeEnd('Multiple Result Sets Duration')
 }
 
 async function testErrorHandling(db) {
+  console.time('Error Handling Duration')
   console.log('\n[9/10] Testing Error Handling...')
   try {
     await db.exec('SELECT * FROM THIS_TABLE_DOES_NOT_EXIST')
@@ -218,12 +231,12 @@ async function testErrorHandling(db) {
     console.log('    Successfully caught expected error.')
   }
   await db.rollback()
+  console.timeEnd('Error Handling Duration')
 }
 
 // --- Test Runner ---
 
 async function runTests(db) {
-  console.time('Total Test Duration')
   await testCreateTable(db)
   await testInsertAndCommit(db)
   await testRollback(db)
@@ -231,19 +244,22 @@ async function runTests(db) {
   await testCreateAndExecuteProcedures(db)
   await testMultipleResultSets(db)
   await testErrorHandling(db)
-  console.timeEnd('Total Test Duration')
 }
 
 async function main() {
+  console.time('Total Test Duration')
   const client = new sqlanywhere.createConnection()
   const db = promisifyDb(client)
 
   try {
     console.log('--- TEST SUITE START ---')
+    console.time('Connection Duration')
     console.log('\n[1/10] Connecting to database...')
     await db.connect(connParams)
     console.log('    Connection successful!')
+    console.timeEnd('Connection Duration')
 
+    console.time('Cleanup Duration')
     console.log('\n[2/10] Cleaning up previous test objects...')
     await db.exec(`DROP PROCEDURE IF EXISTS ${testProcName}`)
     await db.exec(`DROP PROCEDURE IF EXISTS ${updateProcName}`)
@@ -251,6 +267,7 @@ async function main() {
     await db.exec(`DROP TABLE IF EXISTS ${testTableName}`)
     await db.commit()
     console.log('    Cleanup complete.')
+    console.timeEnd('Cleanup Duration')
 
     await runTests(db)
   } catch (error) {
@@ -262,6 +279,7 @@ async function main() {
     console.log('    Disconnected.')
     console.log('\n--- TEST SUITE COMPLETE ---')
   }
+  console.timeEnd('Total Test Duration')
 }
 
 main()
