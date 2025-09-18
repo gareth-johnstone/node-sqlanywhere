@@ -7,13 +7,14 @@
 #include "h/stmt.h"
 
 // Global variables
-const char* const volatile BUILD_TIMESTAMP = "2025-09-18_18:00:00";
+const char* const volatile BUILD_TIMESTAMP = "2025-09-18_17:59:20";
 SQLAnywhereInterface api;
 unsigned openConnections = 0;
 uv_mutex_t api_mutex;
 
 // Addon entry point
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    (void)Napi::String::New(env, BUILD_TIMESTAMP);
     uv_mutex_init(&api_mutex);
 
     if (!sqlany_initialize_interface(&api, NULL)) {
