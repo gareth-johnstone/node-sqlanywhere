@@ -1,10 +1,10 @@
-# node-sqlanywhere
+# @iqx-limited/sqlanywhere
 
 A modern, high-performance Node.js driver for [SAP SQL Anywhere](https://www.sap.com/products/sql-anywhere.html).
 
 This driver is built using N-API, ensuring a stable and future-proof interface that is independent of the underlying JavaScript engine. It is fully `async/await` compatible, providing a clean and modern developer experience.
 
-[![NPM](https://nodei.co/npm/sqlanywhere.png?compact=true)](https://nodei.co/npm/sqlanywhere/)
+[![NPM](https://nodei.co/npm/@iqx-limited/sqlanywhere.svg?compact=true)](https://nodei.co/npm/@iqx-limited/sqlanywheresqlanywhere/)
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ This driver is built using N-API, ensuring a stable and future-proof interface t
 ## Installation
 
 ```sh
-npm install sqlanywhere
+npm install @iqx-limited/sqlanywhere
 ```
 
 The installation process will automatically compile the native C++ addon for your platform.
@@ -25,7 +25,7 @@ The installation process will automatically compile the native C++ addon for you
 The driver uses Promises for all asynchronous operations, making it ideal for use with `async/await`.
 
 ```javascript
-const sqlanywhere = require('sqlanywhere');
+const sqlanywhere = require('@iqx-limited/sqlanywhere');
 
 // --- For security, use environment variables for credentials ---
 const connParams = {
