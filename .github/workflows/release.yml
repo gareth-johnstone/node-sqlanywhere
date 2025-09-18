@@ -91,23 +91,18 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Stage the prebuilds directory.
+          # Stage the prebuilds directory. This is where we force Git to notice the changes.
           git add prebuilds
           
-          # Fetch and checkout the branch the tag originated from. 
-          # Assuming the source branch is 'main'. You may need to change 'main' to 'master'.
-          git fetch origin ${{ github.ref_name }}
-          git checkout ${{ github.ref_name }}
-
-          # Check if there are any staged changes. If not, git commit will fail.
-          # We run the commit and use '|| true' to prevent the overall step from failing
-          # if the binaries were identical (nothing to commit).
-          LATEST_VERSION=$(git describe --tags --abbrev=0)
-          
-          # Force a push, but only if there are actual changes staged (binaries exist and are new)
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "ci: Prebuilt binaries for ${LATEST_VERSION}"
-            git push
-          else
+          # Check if there are any staged changes. If the output is empty, skip commit.
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No new changes to binaries found. Skipping commit and push."
+          else
+            # 1. Commit the new files on the detached HEAD
+            LATEST_VERSION=$(git describe --tags --abbrev=0)
+            git commit -m "ci: Prebuilt binaries for ${LATEST_VERSION}"
+            
+            # 2. Push the newly created commit (from detached HEAD) directly to the master branch.
+            # NOTE: If your main branch is named 'main', change 'master' below to 'main'.
+            git push origin HEAD:master
           fi
