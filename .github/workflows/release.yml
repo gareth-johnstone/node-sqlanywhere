@@ -92,6 +92,9 @@ jobs:
           echo "Final consolidated contents of prebuilds directory:"
           ls -R prebuilds/
 
+      - name: Clean Up Artifacts
+        run: rm -rf downloaded-prebuilds
+
       - name: Configure Git User
         run: |
           git config user.name 'github-actions[bot]'
@@ -100,8 +103,6 @@ jobs:
       - name: Check for Changes
         id: git_status
         run: |
-          # The "M" status indicates a modified file (existing binary was updated)
-          # The "??" status indicates a new file (binary was created from scratch)
           if git status --porcelain | grep -E " M |^\?\? "; then
             echo "changes=true" >> $GITHUB_OUTPUT
           else
@@ -112,22 +113,13 @@ jobs:
         id: npm_version
         if: steps.git_status.outputs.changes == 'true'
         run: |
-          # Stage the prebuilt binaries
           git add prebuilds
-
-          # Use npm version to bump package.json, create a commit, and tag it.
-          # The commit will include both the package.json change AND the staged binaries.
-          # Use 'minor' or 'major' here if you want to increment a different part of the version.
           npm version patch -m "ci: Bump version to %s and commit prebuilt binaries"
-          
-          # Push the new commit and the new tag to the master branch
           git push --follow-tags
-          
-          # Output the new tag for the release step
           echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
-        if: steps.npm_version.outputs.tag # Only run if a new tag was created
+        if: steps.npm_version.outputs.tag
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
