@@ -1,6 +1,5 @@
 name: Bump Version, Build, Commit, and Release
 
-# This workflow is triggered manually from the Actions tab
 on:
   workflow_dispatch:
 
@@ -115,7 +114,6 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
 
-      # Stage the new/modified binaries in their own dedicated step.
       - name: Stage Binary Changes
         if: steps.git_status.outputs.changes == 'true'
         run: git add prebuilds
