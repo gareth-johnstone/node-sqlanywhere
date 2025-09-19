@@ -6,7 +6,7 @@
   "repository": {
     "url": "git+https://github.com/gareth-johnstone/node-sqlanywhere.git"
   },
-  "main": "./lib/index",
+  "main": "index",
   "engines": {
     "node": ">=18.0.0"
   },
