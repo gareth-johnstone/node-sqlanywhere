@@ -2,7 +2,7 @@
   "author": "IQX Limited",
   "name": "@iqx-limited/sqlanywhere",
   "description": "SQL Anywhere JavaScript Driver.",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "repository": {
     "url": "git+https://github.com/gareth-johnstone/node-sqlanywhere.git"
   },
