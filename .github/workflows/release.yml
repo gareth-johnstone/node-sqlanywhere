@@ -114,12 +114,12 @@ jobs:
           else
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
-      
+
       # Stage the new/modified binaries in their own dedicated step.
       - name: Stage Binary Changes
         if: steps.git_status.outputs.changes == 'true'
         run: git add prebuilds
-
+      
       - name: Version, Commit, and Push Changes
         id: commit_and_push
         if: steps.git_status.outputs.changes == 'true'
@@ -136,6 +136,7 @@ jobs:
           git commit -m "ci: Bump version to $NEW_VERSION and commit prebuilt binaries"
           git push
           echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       - name: Create Tag and Release
         if: steps.commit_and_push.outputs.new_tag
@@ -145,6 +146,7 @@ jobs:
         with:
           tag_name: ${{ steps.commit_and_push.outputs.new_tag }}
           release_name: Release ${{ steps.commit_and_push.outputs.new_tag }}
+          commitish: ${{ steps.commit_and_push.outputs.commit_sha }}
           body: |
             Automated release with pre-built binaries.
           draft: false
