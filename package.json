@@ -20,7 +20,8 @@
     "build": "node build.js",
     "test": "echo cd to `examples` and run `npm test`",
     "prebuild": "prebuildify --napi --name sqlanywhere",
-    "release": "echo This is handled by GitHub Actions."
+    "release": "echo This is handled by GitHub Actions.",
+    "publish": "npm publish --access public"
   },
   "devDependencies": {
     "prebuildify": "^6.0.1"
