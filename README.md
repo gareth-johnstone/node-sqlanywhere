@@ -9,8 +9,9 @@ This driver is built using N-API, ensuring a stable and future-proof interface t
 ## Prerequisites
 
 * **Node.js**: Version 18.0.0 or higher.
-* **C++ Toolchain**: A C++ compiler and build tools are required for the native addon compilation. This is typically handled by `node-gyp`. Please see the [`node-gyp` installation guide](https://github.com/nodejs/node-gyp#installation) for platform-specific instructions.
-* **SAP SQL Anywhere**: The appropriate SQL Anywhere client libraries must be installed and correctly configured in your environment (e.g., via the `$SQLANY` environment variable and system path).
+* **SAP SQL Anywhere**: The appropriate SQL Anywhere client libraries must be installed and correctly configured in your environment (e.g., via the `$SQLANY` environment variable and system path). - These can be downloaded from [here](https://help.sap.com/docs/SUPPORT_CONTENT/sqlany/3362971128.html?locale=en-US)
+* If compiling;
+  * **C++ Toolchain**: A C++ compiler and build tools are required for the native addon compilation. This is typically handled by `node-gyp`. Please see the [`node-gyp` installation guide](https://github.com/nodejs/node-gyp#installation) for platform-specific instructions.
 
 ## Installation
 
@@ -18,7 +19,7 @@ This driver is built using N-API, ensuring a stable and future-proof interface t
 npm install @iqx-limited/sqlanywhere
 ```
 
-The installation process will automatically compile the native C++ addon for your platform.
+The installation process will attempt to use pre-built binaries, if that fails, it will automatically compile the native C++ addon for your platform.
 
 ## Getting Started
 
