@@ -75,10 +75,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.NODE_SQLANYWHERE_RELEASE_WORKFLOW }}
 
-      - name: Set up Node.js
+      - name: Set up Node.js for NPM Publishing
         uses: actions/setup-node@v4
         with:
           node-version: '22.19.0'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@iqx-limited'
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
