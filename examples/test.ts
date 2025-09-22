@@ -8,13 +8,13 @@
 // as to the original code.
 // ***************************************************************************
 
-'use strict'
+import assert from "assert"
+import crypto from "crypto"
+import { config } from "dotenv"
 
-const assert = require('assert')
-const crypto = require('crypto') // For uniqueidentifier
-require('dotenv').config()
-// Load the compiled addon directly
-const sqlanywhere = require('../promise')
+config()
+
+import { createConnection, Connection } from '../promise';
 
 // --- Configuration ---
 const connParams = {
@@ -30,7 +30,7 @@ const multiResultProcName = 'GetMultipleResults'
 
 // --- Individual Test Functions ---
 
-async function testCreateTable(db) {
+async function testCreateTable(db: Connection) {
   console.time('Create Table Duration')
   console.log(`\n[3/10] Creating test table '${testTableName}'...`)
   await db.exec(`
@@ -68,7 +68,7 @@ async function testCreateTable(db) {
   console.timeEnd('Create Table Duration')
 }
 
-async function testInsertAndCommit(db) {
+async function testInsertAndCommit(db: Connection) {
   console.time('Insert and Commit Duration')
   console.log('\n[4/10] Testing INSERT and COMMIT...')
   const uuid = crypto.randomUUID()
@@ -91,6 +91,12 @@ async function testInsertAndCommit(db) {
   console.log('    Data inserted and committed.')
 
   let result = await db.exec(`SELECT * FROM ${testTableName} WHERE id_pk = 1`)
+  if (!result) {
+    throw new Error('No data returned when verifying inserted data.')
+  }
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('No rows found when verifying inserted data.')
+  }
   assert.strictEqual(result[0].c_uniqueidentifier.toUpperCase(), uuid.toUpperCase(), 'UNIQUEIDENTIFIER mismatch.')
   assert.strictEqual(result[0].c_xml, xmlData, 'XML mismatch.')
   assert.strictEqual(result[0].c_st_geometry.toUpperCase(), wktGeometry.toUpperCase(), 'ST_GEOMETRY mismatch.')
@@ -98,7 +104,7 @@ async function testInsertAndCommit(db) {
   console.timeEnd('Insert and Commit Duration')
 }
 
-async function testRollback(db) {
+async function testRollback(db: Connection) {
   console.time('Rollback Duration')
   console.log(`\n[5/10] Testing ROLLBACK...`)
   await db.exec(`INSERT INTO ${testTableName} (id_pk, c_varchar) VALUES (?, ?)`, [2, 'To be rolled back'])
@@ -106,16 +112,25 @@ async function testRollback(db) {
   console.log('    Rollback successful.')
 
   const result = await db.exec(`SELECT count(*) as count FROM ${testTableName} WHERE id_pk = 2`)
+  if (!result) {
+    throw new Error('No data returned when verifying inserted data.')
+  }
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('No rows found when verifying inserted data.')
+  }
   assert.strictEqual(result[0].count, 0, 'Data should NOT be present after ROLLBACK.')
   console.log('    Data verified to be absent.')
   console.timeEnd('Rollback Duration')
 }
 
-async function testPreparedStatements(db) {
+async function testPreparedStatements(db: Connection) {
   console.time('Prepared Statements Duration')
   console.log('\n[6/10] Testing Prepared Statements...')
   const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
   const stmt = await db.prepare(insertSQL)
+  if (!stmt) {
+    throw new Error('Failed to prepare statement.')
+  }
   const stmtExec = stmt.exec.bind(stmt)
   const stmtDrop = stmt.drop.bind(stmt)
 
@@ -124,6 +139,12 @@ async function testPreparedStatements(db) {
   console.log('    Prepared INSERT committed.')
 
   const result = await db.exec(`SELECT c_integer FROM ${testTableName} WHERE id_pk = 3`)
+  if (!result) {
+    throw new Error('No data returned when verifying prepared statement data.')
+  }
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('No rows found when verifying prepared statement data.')
+  }
   assert.strictEqual(result[0].c_integer, 123, 'Prepared statement data mismatch.')
   console.log('    Prepared statement data verified.')
 
@@ -132,7 +153,7 @@ async function testPreparedStatements(db) {
   console.timeEnd('Prepared Statements Duration')
 }
 
-async function testCreateAndExecuteProcedures(db) {
+async function testCreateAndExecuteProcedures(db: Connection) {
   console.time('Create and Execute Procedures Duration')
   console.log(`\n[7/10] Creating and testing procedures...`)
   await db.exec(`
@@ -144,6 +165,12 @@ async function testCreateAndExecuteProcedures(db) {
   console.log(`    Procedure '${testProcName}' created.`)
 
   let result = await db.exec(`CALL ${testProcName}(?)`, [1])
+  if (!result) {
+    throw new Error('No data returned when verifying inserted data.')
+  }
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('No rows found when verifying inserted data.')
+  }
   assert.strictEqual(result[0].res_varchar, 'Variable character data', 'Procedure varchar mismatch.')
   assert.strictEqual(result[0].res_double, 1.23456789e10, 'Procedure double mismatch.')
   console.log('    SELECT procedure executed successfully.')
@@ -159,12 +186,18 @@ async function testCreateAndExecuteProcedures(db) {
   await db.commit()
 
   result = await db.exec(`SELECT c_varchar FROM ${testTableName} WHERE id_pk = 1`)
+  if (!result) {
+    throw new Error('No data returned when verifying UPDATE procedure.')
+  }
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('No rows found when verifying UPDATE procedure.')
+  }
   assert.strictEqual(result[0].c_varchar, 'Updated First Entry', 'Procedure data modification failed.')
   console.log('    UPDATE procedure executed successfully.')
   console.timeEnd('Create and Execute Procedures Duration')
 }
 
-async function testMultipleResultSets(db) {
+async function testMultipleResultSets(db: Connection) {
   console.time('Multiple Result Sets Duration')
   console.log('\n[8/10] Testing multiple result sets...')
   await db.exec(`
@@ -178,17 +211,24 @@ async function testMultipleResultSets(db) {
   console.log(`    Procedure '${multiResultProcName}' created.`)
 
   const stmt = await db.prepare(`CALL ${multiResultProcName}()`)
+  if (!stmt) {
+    throw new Error('Failed to prepare statement for multiple result sets.')
+  }
   const stmtExec = stmt.exec.bind(stmt)
   const getMoreResults = stmt.getMoreResults.bind(stmt)
   const stmtDrop = stmt.drop.bind(stmt)
 
   const firstResult = await stmtExec()
-  assert.strictEqual(firstResult.length, 1, 'First result set should have one row.')
-  assert.strictEqual(firstResult[0].c_varchar, 'Updated First Entry', 'First result set data mismatch.')
-  console.log('    First result set verified.')
+  if (Array.isArray(firstResult)) {
+    assert.strictEqual(firstResult.length, 1, 'First result set should have one row.')
+    assert.strictEqual(firstResult[0].c_varchar, 'Updated First Entry', 'First result set data mismatch.')
+  } else {
+    assert.fail('First result set is not an array.')
+  }
+  console.log('First result set verified.')
 
   const secondResult = await getMoreResults()
-  assert.strictEqual(secondResult.length, 1, 'Second result set should have one row.')
+  assert.strictEqual(secondResult?.length, 1, 'Second result set should have one row.')
   assert.strictEqual(secondResult[0].c_integer, 123, 'Second result set data mismatch.')
   console.log('    Second result set verified.')
 
@@ -197,6 +237,9 @@ async function testMultipleResultSets(db) {
     // If this line is reached, the test fails because an error was expected.
     assert.fail('Expected an error when fetching beyond the last result set, but none was thrown.')
   } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     // This is the expected outcome. We verify it's the correct informational message.
     assert.ok(error.message.includes('Procedure has completed'), `Expected "Procedure has completed" error, but got: ${error.message}`)
     console.log('    End of result sets confirmed with expected message.')
@@ -207,13 +250,16 @@ async function testMultipleResultSets(db) {
   console.timeEnd('Multiple Result Sets Duration')
 }
 
-async function testErrorHandling(db) {
+async function testErrorHandling(db: Connection) {
   console.time('Error Handling Duration')
   console.log('\n[9/10] Testing Error Handling...')
   try {
     await db.exec('SELECT * FROM THIS_TABLE_DOES_NOT_EXIST')
     throw new Error('Query should have failed but it succeeded.')
   } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     assert.ok(error.message.includes('not found'), 'Error message should indicate table not found.')
     console.log('    Successfully caught expected error.')
   }
@@ -223,7 +269,7 @@ async function testErrorHandling(db) {
 
 // --- Test Runner ---
 
-async function runTests(db) {
+async function runTests(db: Connection) {
   await testCreateTable(db)
   await testInsertAndCommit(db)
   await testRollback(db)
@@ -235,7 +281,7 @@ async function runTests(db) {
 
 async function main() {
   console.time('Total Test Duration')
-  const db = new sqlanywhere.createConnection()
+  const db = new createConnection ( )
 
   try {
     console.log('--- TEST SUITE START ---')

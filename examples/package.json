@@ -7,11 +7,16 @@
     "prestart": "npm install",
     "pretest": "npm install",
     "start": "node test.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "test:ts": "npx -y tsx test.ts"
   },
   "author": "Gareth Johnstone",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2"
   }
 }
