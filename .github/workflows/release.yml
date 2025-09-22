@@ -153,3 +153,9 @@ jobs:
       - name: No Changes Detected
         if: steps.git_status.outputs.changes == 'false'
         run: echo "No changes to binaries found. Skipping version bump and release."
+
+      - name: Publish to NPM
+        if: steps.commit_and_push.outputs.new_tag
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
