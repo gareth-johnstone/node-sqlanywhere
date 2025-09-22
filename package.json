@@ -7,7 +7,6 @@
     "url": "git+https://github.com/gareth-johnstone/node-sqlanywhere.git"
   },
   "main": "index",
-  "types": "types/sqlanywhere.d.ts",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -15,6 +14,10 @@
   "dependencies": {
     "node-addon-api": "^8.5.0",
     "node-gyp-build": "^4.8.4"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./promise": "./promise.js"
   },
   "scripts": {
     "install": "node-gyp-build",

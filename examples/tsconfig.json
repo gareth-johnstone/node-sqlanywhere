@@ -5,8 +5,7 @@
     "baseUrl": "./",
     "moduleResolution": "Node",
     "typeRoots": [
-      "node_modules/@types",
-      "../types/index.d.ts"
+      "node_modules/@types"
     ],
     "resolveJsonModule": true,
     "allowJs": false,

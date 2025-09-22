@@ -8,23 +8,13 @@
 // as to the original code.
 // ***************************************************************************
 
-import util from "util"
 import assert from "assert"
 import crypto from "crypto"
 import { config } from "dotenv"
 
-interface Db {
-  connect: (arg1: ConnectionParams) => Promise<void>;
-  disconnect: () => Promise<void>;
-  exec: (sql: string, params?: QueryParams | undefined) => Promise<number | QueryResult | undefined>;
-  prepare: (sql: string) => Promise<Statement | undefined>;
-  commit: () => Promise<void>;
-  rollback: () => Promise<void>;
-}
-
 config()
 
-import { Connection, Statement, QueryResult, ConnectionParams, createConnection, QueryParams } from '..';
+import { createConnection, Connection } from '../promise';
 
 // --- Configuration ---
 const connParams = {
@@ -38,21 +28,9 @@ const testProcName = 'GetProductInfo'
 const updateProcName = 'UpdateProductName'
 const multiResultProcName = 'GetMultipleResults'
 
-// --- Utility ---
-function promisifyDb (client: Connection) {
-  return {
-    connect: util.promisify(client.connect).bind(client),
-    disconnect: util.promisify(client.disconnect).bind(client),
-    exec: util.promisify(client.exec).bind(client),
-    prepare: util.promisify(client.prepare).bind(client),
-    commit: util.promisify(client.commit).bind(client),
-    rollback: util.promisify(client.rollback).bind(client)
-  }
-}
-
 // --- Individual Test Functions ---
 
-async function testCreateTable(db: Db) {
+async function testCreateTable(db: Connection) {
   console.time('Create Table Duration')
   console.log(`\n[3/10] Creating test table '${testTableName}'...`)
   await db.exec(`
@@ -90,7 +68,7 @@ async function testCreateTable(db: Db) {
   console.timeEnd('Create Table Duration')
 }
 
-async function testInsertAndCommit(db: Db) {
+async function testInsertAndCommit(db: Connection) {
   console.time('Insert and Commit Duration')
   console.log('\n[4/10] Testing INSERT and COMMIT...')
   const uuid = crypto.randomUUID()
@@ -126,7 +104,7 @@ async function testInsertAndCommit(db: Db) {
   console.timeEnd('Insert and Commit Duration')
 }
 
-async function testRollback(db: Db) {
+async function testRollback(db: Connection) {
   console.time('Rollback Duration')
   console.log(`\n[5/10] Testing ROLLBACK...`)
   await db.exec(`INSERT INTO ${testTableName} (id_pk, c_varchar) VALUES (?, ?)`, [2, 'To be rolled back'])
@@ -145,7 +123,7 @@ async function testRollback(db: Db) {
   console.timeEnd('Rollback Duration')
 }
 
-async function testPreparedStatements(db: Db) {
+async function testPreparedStatements(db: Connection) {
   console.time('Prepared Statements Duration')
   console.log('\n[6/10] Testing Prepared Statements...')
   const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
@@ -153,12 +131,8 @@ async function testPreparedStatements(db: Db) {
   if (!stmt) {
     throw new Error('Failed to prepare statement.')
   }
-  const stmtExec = (params: QueryParams) => new Promise<number | QueryResult | undefined>((resolve, reject) => {
-    stmt.exec(params, (err, res) => err ? reject(err) : resolve(res));
-  });
-  const stmtDrop = () => new Promise<void>((resolve, reject) => {
-      stmt.drop(err => err ? reject(err) : resolve());
-  });
+  const stmtExec = stmt.exec.bind(stmt)
+  const stmtDrop = stmt.drop.bind(stmt)
 
   await stmtExec([3, 'Prepared Statement', 123])
   await db.commit()
@@ -179,7 +153,7 @@ async function testPreparedStatements(db: Db) {
   console.timeEnd('Prepared Statements Duration')
 }
 
-async function testCreateAndExecuteProcedures(db: Db) {
+async function testCreateAndExecuteProcedures(db: Connection) {
   console.time('Create and Execute Procedures Duration')
   console.log(`\n[7/10] Creating and testing procedures...`)
   await db.exec(`
@@ -223,7 +197,7 @@ async function testCreateAndExecuteProcedures(db: Db) {
   console.timeEnd('Create and Execute Procedures Duration')
 }
 
-async function testMultipleResultSets(db: Db) {
+async function testMultipleResultSets(db: Connection) {
   console.time('Multiple Result Sets Duration')
   console.log('\n[8/10] Testing multiple result sets...')
   await db.exec(`
@@ -240,18 +214,9 @@ async function testMultipleResultSets(db: Db) {
   if (!stmt) {
     throw new Error('Failed to prepare statement for multiple result sets.')
   }
-  const stmtExec = () => new Promise<QueryResult | number | undefined>((resolve, reject) => {
-    stmt.exec((err, res) => err ? reject(err) : resolve(res));
-  });
-  const getMoreResults = () => new Promise<QueryResult | undefined>((resolve, reject) => {
-      stmt.getMoreResults((err, res) => err ? reject(err) : resolve(res));
-  });
-  const stmtDrop = () => new Promise<void>((resolve, reject) => {
-      stmt.drop(err => err ? reject(err) : resolve());
-  });
-  // const stmtExec = util.promisify(stmt.exec).bind(stmt)
-  // const getMoreResults = util.promisify(stmt.getMoreResults).bind(stmt)
-  // const stmtDrop = util.promisify(stmt.drop).bind(stmt)
+  const stmtExec = stmt.exec.bind(stmt)
+  const getMoreResults = stmt.getMoreResults.bind(stmt)
+  const stmtDrop = stmt.drop.bind(stmt)
 
   const firstResult = await stmtExec()
   if (Array.isArray(firstResult)) {
@@ -285,7 +250,7 @@ async function testMultipleResultSets(db: Db) {
   console.timeEnd('Multiple Result Sets Duration')
 }
 
-async function testErrorHandling(db: Db) {
+async function testErrorHandling(db: Connection) {
   console.time('Error Handling Duration')
   console.log('\n[9/10] Testing Error Handling...')
   try {
@@ -304,7 +269,7 @@ async function testErrorHandling(db: Db) {
 
 // --- Test Runner ---
 
-async function runTests(db: Db) {
+async function runTests(db: Connection) {
   await testCreateTable(db)
   await testInsertAndCommit(db)
   await testRollback(db)
@@ -316,8 +281,7 @@ async function runTests(db: Db) {
 
 async function main() {
   console.time('Total Test Duration')
-  const client = new createConnection ( )
-  const db = promisifyDb(client)
+  const db = new createConnection ( )
 
   try {
     console.log('--- TEST SUITE START ---')

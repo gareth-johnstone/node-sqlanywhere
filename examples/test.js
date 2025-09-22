@@ -10,12 +10,11 @@
 
 'use strict'
 
-const util = require('util')
 const assert = require('assert')
 const crypto = require('crypto') // For uniqueidentifier
 require('dotenv').config()
 // Load the compiled addon directly
-const sqlanywhere = require('../build/Release/sqlanywhere.node')
+const sqlanywhere = require('../promise')
 
 // --- Configuration ---
 const connParams = {
@@ -28,18 +27,6 @@ const testTableName = 'NAPI_DRIVER_TEST'
 const testProcName = 'GetProductInfo'
 const updateProcName = 'UpdateProductName'
 const multiResultProcName = 'GetMultipleResults'
-
-// --- Utility ---
-function promisifyDb(client) {
-  return {
-    connect: util.promisify(client.connect).bind(client),
-    disconnect: util.promisify(client.disconnect).bind(client),
-    exec: util.promisify(client.exec).bind(client),
-    prepare: util.promisify(client.prepare).bind(client),
-    commit: util.promisify(client.commit).bind(client),
-    rollback: util.promisify(client.rollback).bind(client)
-  }
-}
 
 // --- Individual Test Functions ---
 
@@ -129,8 +116,8 @@ async function testPreparedStatements(db) {
   console.log('\n[6/10] Testing Prepared Statements...')
   const insertSQL = `INSERT INTO ${testTableName} (id_pk, c_varchar, c_integer) VALUES (?, ?, ?)`
   const stmt = await db.prepare(insertSQL)
-  const stmtExec = util.promisify(stmt.exec).bind(stmt)
-  const stmtDrop = util.promisify(stmt.drop).bind(stmt)
+  const stmtExec = stmt.exec.bind(stmt)
+  const stmtDrop = stmt.drop.bind(stmt)
 
   await stmtExec([3, 'Prepared Statement', 123])
   await db.commit()
@@ -191,9 +178,9 @@ async function testMultipleResultSets(db) {
   console.log(`    Procedure '${multiResultProcName}' created.`)
 
   const stmt = await db.prepare(`CALL ${multiResultProcName}()`)
-  const stmtExec = util.promisify(stmt.exec).bind(stmt)
-  const getMoreResults = util.promisify(stmt.getMoreResults).bind(stmt)
-  const stmtDrop = util.promisify(stmt.drop).bind(stmt)
+  const stmtExec = stmt.exec.bind(stmt)
+  const getMoreResults = stmt.getMoreResults.bind(stmt)
+  const stmtDrop = stmt.drop.bind(stmt)
 
   const firstResult = await stmtExec()
   assert.strictEqual(firstResult.length, 1, 'First result set should have one row.')
@@ -248,8 +235,7 @@ async function runTests(db) {
 
 async function main() {
   console.time('Total Test Duration')
-  const client = new sqlanywhere.createConnection()
-  const db = promisifyDb(client)
+  const db = new sqlanywhere.createConnection()
 
   try {
     console.log('--- TEST SUITE START ---')

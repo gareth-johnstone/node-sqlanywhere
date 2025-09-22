@@ -31,10 +31,16 @@ The installation process will attempt to use pre-built binaries, if that fails, 
 
 ## Getting Started
 
-The driver uses Promises for all asynchronous operations, making it ideal for use with `async/await`.
+> [!TIP]
+> This package provides two entry points:
+>
+> - `@iqx-limited/sqlanywhere`: Exposes the original callback-based API.
+> - `@iqx-limited/sqlanywhere/promise`: Exposes a fully promisified API, ideal for use with `async/await`.
+>
+> All examples below use the `/promise` entry point for modern, promise-based usage. If you prefer callbacks, use the main package import instead.
 
 ```javascript
-const sqlanywhere = require('@iqx-limited/sqlanywhere');
+const sqlanywhere = require('@iqx-limited/sqlanywhere/promise');
 
 // --- For security, use environment variables for credentials ---
 const connParams = {
@@ -72,10 +78,6 @@ async function main() {
 
 main();
 ```
-
-## API Reference
-
-All asynchronous methods return a `Promise`.
 
 ### Connection
 
