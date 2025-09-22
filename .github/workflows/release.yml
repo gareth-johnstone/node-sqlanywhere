@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.NODE_SQLANYWHERE_RELEASE_WORKFLOW }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -140,7 +140,7 @@ jobs:
         if: steps.commit_and_push.outputs.new_tag
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.NODE_SQLANYWHERE_RELEASE_WORKFLOW }}
         with:
           tag_name: ${{ steps.commit_and_push.outputs.new_tag }}
           release_name: Release ${{ steps.commit_and_push.outputs.new_tag }}
