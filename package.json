@@ -7,6 +7,7 @@
     "url": "git+https://github.com/gareth-johnstone/node-sqlanywhere.git"
   },
   "main": "index",
+  "types": "types/sqlanywhere.d.ts",
   "engines": {
     "node": ">=18.0.0"
   },
